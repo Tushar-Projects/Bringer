@@ -1,0 +1,28 @@
+# Virtual environment
+.venv/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+
+# ChromaDB persistent storage
+vector_db/*
+!vector_db/.gitkeep
+
+# Logs
+logs/*
+!logs/.gitkeep
+
+# Documents (user content, not tracked)
+documents/*
+!documents/.gitkeep
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+Thumbs.db
+.DS_Store
