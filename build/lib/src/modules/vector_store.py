@@ -20,7 +20,6 @@ import os
 # Add project root to path so we can import config
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 import config
-from src.modules.logging_utils import debug_print
 
 console = Console()
 
@@ -97,7 +96,7 @@ class VectorStore:
         
         if count > 0:
             self.collection.delete(where={"file_path": path_str})
-            debug_print(f"[yellow]Removed {count} old chunks for {Path(file_path).name}[/yellow]")
+            console.print(f"[yellow]Removed {count} old chunks for {Path(file_path).name}[/yellow]")
             
         return count
 
@@ -152,7 +151,7 @@ class VectorStore:
         )
         
         t_store = time.perf_counter() - t0
-        debug_print(f"[green]Stored {len(ids)} vectors in ChromaDB ({t_store*1000:.1f}ms).[/green]")
+        console.print(f"[green]Stored {len(ids)} vectors in ChromaDB ({t_store*1000:.1f}ms).[/green]")
         return True
 
     def semantic_search(self, query_embedding: List[float], n_results: int = config.SEMANTIC_TOP_K) -> Dict[str, Any]:
@@ -167,7 +166,7 @@ class VectorStore:
             ChromaDB query results dictionary.
         """
         if self.collection.count() == 0:
-            debug_print("[yellow]Vector store is empty. No results found.[/yellow]")
+            console.print("[yellow]Vector store is empty. No results found.[/yellow]")
             return {"ids": [[]], "distances": [[]], "metadatas": [[]], "documents": [[]]}
             
         # Chroma expects a batch of queries, so we wrap in a list

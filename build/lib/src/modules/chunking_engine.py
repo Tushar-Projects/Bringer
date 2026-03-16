@@ -23,7 +23,6 @@ import os
 # Add project root to path so we can import config
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 import config
-from src.modules.logging_utils import debug_print
 
 console = Console()
 
@@ -86,7 +85,7 @@ class ChunkingEngine:
         base_meta = document_dict.get("metadata", {})
         
         if not text or not text.strip():
-            debug_print(f"[yellow]Skipping empty document: {base_meta.get('source_file', 'Unknown')}[/yellow]")
+            console.print(f"[yellow]Skipping empty document: {base_meta.get('source_file', 'Unknown')}[/yellow]")
             return []
 
         # 1. Normalize text
@@ -140,8 +139,8 @@ class ChunkingEngine:
         
         if structured_chunks:
             avg_tokens = sum(c['metadata']['token_count'] for c in structured_chunks) / len(structured_chunks)
-            debug_print(f"Generated {len(structured_chunks)} chunks for [cyan]{base_meta.get('source_file', 'Unknown')}[/cyan] (avg {avg_tokens:.1f} tokens)")
-            debug_print(f"  [dim]Timing: Norm {t_norm*1000:.1f}ms | Split {t_split*1000:.1f}ms | Meta/TokenCount {t_meta*1000:.1f}ms[/dim]")
+            console.print(f"Generated {len(structured_chunks)} chunks for [cyan]{base_meta.get('source_file', 'Unknown')}[/cyan] (avg {avg_tokens:.1f} tokens)")
+            console.print(f"  [dim]Timing: Norm {t_norm*1000:.1f}ms | Split {t_split*1000:.1f}ms | Meta/TokenCount {t_meta*1000:.1f}ms[/dim]")
         
         return structured_chunks
 
@@ -160,7 +159,7 @@ class ChunkingEngine:
             chunks = self.chunk_document(doc)
             all_chunks.extend(chunks)
             
-        debug_print(f"[green]Total chunks generated across {len(documents)} documents: {len(all_chunks)}[/green]")
+        console.print(f"[green]Total chunks generated across {len(documents)} documents: {len(all_chunks)}[/green]")
         return all_chunks
 
 

@@ -6,14 +6,9 @@ to dynamically select the most appropriate LLM tier for local inference.
 """
 
 import psutil
-import subprocess
+import torch
 from typing import Dict, Any, Tuple
 from rich.console import Console
-
-try:
-    import torch
-except Exception:  # pragma: no cover - handled via fallback detection
-    torch = None
 
 import sys
 import os
@@ -26,57 +21,10 @@ console = Console()
 class HardwareDetector:
     def __init__(self):
         """Initializes the detector."""
+        self.gpu_available = torch.cuda.is_available()
+        # If FORCE_CPU is set in config, simulate no GPU
         if config.FORCE_CPU:
             self.gpu_available = False
-            self.gpu_name = "Forced CPU"
-        else:
-            self.gpu_available, self.gpu_name = self.detect_gpu()
-
-    def _detect_gpu_via_torch(self) -> Tuple[bool, str]:
-        """Checks whether CUDA is available via PyTorch."""
-        if torch is None:
-            return False, "N/A"
-
-        try:
-            if torch.cuda.is_available():
-                return True, torch.cuda.get_device_name(0)
-        except Exception:
-            pass
-
-        return False, "N/A"
-
-    def _detect_gpu_via_nvidia_smi(self) -> Tuple[bool, str]:
-        """Checks whether an NVIDIA GPU is present using nvidia-smi."""
-        query_result = subprocess.run(
-            ["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"],
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        if query_result.returncode == 0:
-            gpu_name = query_result.stdout.strip().splitlines()[0] if query_result.stdout.strip() else "NVIDIA GPU available"
-            return True, gpu_name
-
-        probe_result = subprocess.run(
-            ["nvidia-smi"],
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        if probe_result.returncode == 0:
-            return True, "NVIDIA GPU available"
-
-        return False, "N/A"
-
-    def detect_gpu(self) -> Tuple[bool, str]:
-        """
-        Detects GPU availability using PyTorch first, then nvidia-smi as a fallback.
-        """
-        gpu_available, gpu_name = self._detect_gpu_via_torch()
-        if gpu_available:
-            return gpu_available, gpu_name
-
-        return self._detect_gpu_via_nvidia_smi()
 
     def is_plugged_in(self) -> bool:
         """
@@ -97,7 +45,7 @@ class HardwareDetector:
         
         status = {
             "gpu_available": self.gpu_available,
-            "gpu_name": self.gpu_name if self.gpu_available else "N/A",
+            "gpu_name": torch.cuda.get_device_name(0) if self.gpu_available else "N/A",
             "plugged_in": plugged_in
         }
         return status

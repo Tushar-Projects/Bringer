@@ -17,7 +17,6 @@ import os
 # Add project root to path so we can import config
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 import config
-from src.modules.logging_utils import debug_print
 
 console = Console()
 
@@ -28,11 +27,11 @@ def get_reranker_model() -> CrossEncoder:
     """Lazy loader for the cross-encoder model."""
     global _RERANKER_MODEL
     if _RERANKER_MODEL is None:
-        debug_print(f"[dim]Loading reranker model '{config.RERANKER_MODEL_NAME}' onto {config.DEVICE}...[/dim]")
+        console.print(f"[dim]Loading reranker model '{config.RERANKER_MODEL_NAME}' onto {config.DEVICE}...[/dim]")
         t0 = time.perf_counter()
         _RERANKER_MODEL = CrossEncoder(config.RERANKER_MODEL_NAME, device=config.DEVICE)
         load_time = time.perf_counter() - t0
-        debug_print(f"[green]Reranker loaded in {load_time:.2f}s.[/green]")
+        console.print(f"[green]Reranker loaded in {load_time:.2f}s.[/green]")
     return _RERANKER_MODEL
 
 
@@ -60,7 +59,7 @@ class Reranker:
             chunks[0]["rerank_score"] = 1.0 # arbitrary default for single chunks
             return chunks
 
-        debug_print(f"[dim]Reranking {len(chunks)} chunks...[/dim]")
+        console.print(f"[dim]Reranking {len(chunks)} chunks...[/dim]")
         t0 = time.perf_counter()
         
         # Build pairs of (query, document) for the cross-encoder
@@ -79,7 +78,7 @@ class Reranker:
         top_chunks = chunks[:top_k]
         
         t_rank = time.perf_counter() - t0
-        debug_print(f"[dim]Reranker reduced {len(chunks)} down to Top {len(top_chunks)} ({t_rank*1000:.1f}ms).[/dim]")
+        console.print(f"[dim]Reranker reduced {len(chunks)} down to Top {len(top_chunks)} ({t_rank*1000:.1f}ms).[/dim]")
         
         return top_chunks
 

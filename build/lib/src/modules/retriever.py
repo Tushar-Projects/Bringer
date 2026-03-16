@@ -21,7 +21,6 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '.
 import config
 from src.modules.embedding_engine import get_embedding_model
 from src.modules.vector_store import VectorStore
-from src.modules.logging_utils import debug_print
 
 console = Console()
 
@@ -46,10 +45,10 @@ class Retriever:
             A list of dictionary objects containing 'content', 'metadata', and 'score'.
         """
         if not query or not query.strip():
-            debug_print("[yellow]Empty query provided to retriever.[/yellow]")
+            console.print("[yellow]Empty query provided to retriever.[/yellow]")
             return []
 
-        debug_print(f"\n[bold cyan]Query:[/bold cyan] '{query}'")
+        console.print(f"\n[bold cyan]Query:[/bold cyan] '{query}'")
         
         # 1. Embed the query (utilizes LRU cache to save time on identical sub-queries)
         t0 = time.perf_counter()
@@ -104,14 +103,14 @@ class Retriever:
         if formatted_results:
             top_score = formatted_results[0]["score"]
             avg_score = sum(r["score"] for r in formatted_results) / len(formatted_results)
-            debug_print(f"[green]Retrieved {len(formatted_results)} chunks[/green] "
-                        f"(Discarded {len(distances) - len(formatted_results)} below threshold {self.min_score})")
-            debug_print(f"Top similarity score: [bold green]{top_score:.4f}[/bold green]")
-            debug_print(f"Average score: [cyan]{avg_score:.4f}[/cyan]")
+            console.print(f"[green]Retrieved {len(formatted_results)} chunks[/green] "
+                          f"(Discarded {len(distances) - len(formatted_results)} below threshold {self.min_score})")
+            console.print(f"Top similarity score: [bold green]{top_score:.4f}[/bold green]")
+            console.print(f"Average score: [cyan]{avg_score:.4f}[/cyan]")
         else:
-            debug_print(f"[yellow]No chunks met the minimum similarity threshold ({self.min_score}).[/yellow]")
+            console.print(f"[yellow]No chunks met the minimum similarity threshold ({self.min_score}).[/yellow]")
             
-        debug_print(f"[dim]Timing: Embed {t_embed*1000:.1f}ms | Search {t_search*1000:.1f}ms | Process {t_process*1000:.1f}ms[/dim]")
+        console.print(f"[dim]Timing: Embed {t_embed*1000:.1f}ms | Search {t_search*1000:.1f}ms | Process {t_process*1000:.1f}ms[/dim]")
         
         return formatted_results
 

@@ -23,7 +23,6 @@ from src.modules.document_loader import DocumentLoader
 from src.modules.chunking_engine import ChunkingEngine
 from src.modules.embedding_engine import EmbeddingEngine
 from src.modules.vector_store import VectorStore
-from src.modules.logging_utils import debug_print
 
 console = Console()
 
@@ -67,13 +66,13 @@ class DocumentIndexingHandler(FileSystemEventHandler):
 
     def _index_document(self, file_path: Path):
         """Runs the full indexing pipeline for a single document."""
-        debug_print(f"\n[bold cyan]Indexing document...[/bold cyan]")
+        console.print(f"\n[bold cyan]Indexing document...[/bold cyan]")
         
         t0 = time.perf_counter()
         
         # 1. Check if already indexed and unmodified
         if self.store.is_file_indexed(file_path):
-            debug_print(f"[dim]File '{file_path.name}' is already up-to-date.[/dim]")
+            console.print(f"[dim]File '{file_path.name}' is already up-to-date.[/dim]")
             return
             
         # Remove old chunks if it's a modification
@@ -82,13 +81,13 @@ class DocumentIndexingHandler(FileSystemEventHandler):
         # 2. Extract Text
         pages = self.loader.load_document(file_path)
         if not pages:
-            debug_print(f"[yellow]Failed to extract text from {file_path.name}[/yellow]")
+            console.print(f"[yellow]Failed to extract text from {file_path.name}[/yellow]")
             return
             
         # 3. Chunk
         chunks = self.chunker.chunk_documents(pages)
         if not chunks:
-            debug_print(f"[yellow]No valid chunks generated from {file_path.name}[/yellow]")
+            console.print(f"[yellow]No valid chunks generated from {file_path.name}[/yellow]")
             return
             
         # 4. Embed
@@ -100,13 +99,13 @@ class DocumentIndexingHandler(FileSystemEventHandler):
         t_total = time.perf_counter() - t0
         
         if success:
-            debug_print(f"Chunks generated: {len(chunks)}")
-            debug_print(f"Embeddings created: {len(embedded_chunks)}")
-            debug_print(f"[bold green]Vector database updated ({t_total:.1f}s).[/bold green]\n")
+            console.print(f"Chunks generated: {len(chunks)}")
+            console.print(f"Embeddings created: {len(embedded_chunks)}")
+            console.print(f"[bold green]Vector database updated ({t_total:.1f}s).[/bold green]\n")
 
     def _remove_document(self, file_path: Path):
         """Removes a document from the vector store."""
-        debug_print(f"\n[yellow]Removing {file_path.name} from vector database...[/yellow]")
+        console.print(f"\n[yellow]Removing {file_path.name} from vector database...[/yellow]")
         self.store.remove_file(file_path)
 
     def on_created(self, event):
@@ -114,7 +113,7 @@ class DocumentIndexingHandler(FileSystemEventHandler):
             return
         path = Path(event.src_path)
         if self._is_valid_file(path) and not self._should_debounce(str(path)):
-            debug_print(f"\n[cyan]File detected:[/cyan] {path.name}")
+            console.print(f"\n[cyan]File detected:[/cyan] {path.name}")
             self._index_document(path)
 
     def on_modified(self, event):
@@ -122,7 +121,7 @@ class DocumentIndexingHandler(FileSystemEventHandler):
             return
         path = Path(event.src_path)
         if self._is_valid_file(path) and not self._should_debounce(str(path)):
-            debug_print(f"\n[cyan]File modified:[/cyan] {path.name}")
+            console.print(f"\n[cyan]File modified:[/cyan] {path.name}")
             self._index_document(path)
 
     def on_deleted(self, event):
@@ -130,7 +129,7 @@ class DocumentIndexingHandler(FileSystemEventHandler):
             return
         path = Path(event.src_path)
         if self._is_valid_file(path):
-            debug_print(f"\n[red]File deleted:[/red] {path.name}")
+            console.print(f"\n[red]File deleted:[/red] {path.name}")
             self._remove_document(path)
 
 
@@ -145,7 +144,7 @@ class DocumentWatcher:
         config.DOCUMENTS_DIR.mkdir(parents=True, exist_ok=True)
         self.observer.schedule(self.handler, self.watch_dir, recursive=False)
         self.observer.start()
-        debug_print(f"[dim]Starting document watcher on {self.watch_dir}...[/dim]")
+        console.print(f"[dim]Starting document watcher on {self.watch_dir}...[/dim]")
         
     def stop(self):
         """Stops the observer."""
