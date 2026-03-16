@@ -1,30 +1,35 @@
 """
-Bringer RAG System — LM Studio Manager
+Bringer RAG System - LM Studio Manager
 
 Responsible for auto-starting the local LM Studio server if it is offline.
-Checks currently loaded models via the API. Unloads incorrect models to save VRAM,
-and ensures the correct language model (selected by hardware detection)
-is loaded before generation begins.
+Checks loaded models via the API, unloads incorrect models, and
+ensures the exact requested model is loaded before generation begins.
 """
 
-import time
-import httpx
+import os
 import subprocess
+import sys
+import time
 from typing import List
+
+import httpx
 from rich.console import Console
 
-import sys
-import os
 # Add project root to path so we can import config
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 import config
 
 console = Console()
 
+
 class LMStudioManager:
     def __init__(self):
         self.api_base = config.LLM_API_BASE
-        self.timeout = 5.0  # Quick timeout for health checks
+        self.timeout = 5.0
+        self.model_poll_interval = 2.0
+        self.model_load_timeout = 120.0
+        self.unload_timeout = 30.0
+        self.readiness_timeout = 30.0
 
     def is_server_running(self) -> bool:
         """Pings the /v1/models endpoint to check if LM Studio is responding."""
@@ -41,29 +46,27 @@ class LMStudioManager:
         """Launches LM Studio locally in server mode using the `lms` CLI."""
         console.print("[yellow]LM Studio server is not running.[/yellow]")
         console.print("[dim]Starting server via `lms server start`...[/dim]")
-        
+
         try:
             subprocess.Popen(
-                ["lms", "server", "start"], 
-                stdout=subprocess.DEVNULL, 
+                ["lms", "server", "start"],
+                stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
-                shell=True
+                shell=False,
             )
         except Exception as e:
-            console.print(f"[bold red]Critical Error launching lms:[/bold red] {e}")
+            console.print(f"[bold red]Critical error launching lms:[/bold red] {e}")
             console.print("[red]LM Studio CLI tools are not installed or not in PATH.[/red]")
             sys.exit(1)
-            
-        # Poll until the server stands up
+
         console.print("[cyan]Waiting for server to become ready[/cyan]", end="")
-        max_retries = 30
-        for _ in range(max_retries):
+        for _ in range(30):
             if self.is_server_running():
-                console.print("\n[green]LM Studio Server is online.[/green]")
+                console.print("\n[green]LM Studio server is online.[/green]")
                 return
             time.sleep(1)
             print(".", end="", flush=True)
-            
+
         console.print("\n[bold red]Error: LM Studio server failed to start or timed out.[/bold red]")
         sys.exit(1)
 
@@ -75,20 +78,19 @@ class LMStudioManager:
                 if response.status_code == 200:
                     data = response.json()
                     loaded = [model.get("id", "") for model in data.get("data", [])]
-                    return [m for m in loaded if m]
+                    return [model_id for model_id in loaded if model_id]
         except Exception as e:
             console.print(f"[dim]Failed checking loaded models: {e}[/dim]")
         return []
-        
+
     def is_model_ready_for_generation(self, model_name: str) -> bool:
         """
-        Actively verifies if the model is ready by sending a minimal test completion request.
-        This proves the model is fully loaded into VRAM and accepting generation commands.
+        Verifies the model is ready by sending a minimal test completion request.
         """
         payload = {
             "model": model_name,
             "messages": [{"role": "user", "content": "ping"}],
-            "max_tokens": 1
+            "max_tokens": 1,
         }
         try:
             with httpx.Client(timeout=self.timeout) as client:
@@ -97,91 +99,114 @@ class LMStudioManager:
         except Exception:
             return False
 
-    def unload_all_models(self):
-        """Unloads all currently loaded models using the LMS CLI to free VRAM."""
-        console.print("[dim]Unloading currently loaded models from VRAM...[/dim]")
-        try:
-            subprocess.run(
-                ["lms", "unload", "--all"],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                shell=True
-            )
-            # Short wait for VRAM to clear
-            time.sleep(2)
-        except Exception as e:
-            console.print(f"[dim]Warning: Failed to execute unload command: {e}[/dim]")
-
-    def load_model(self, desired_model: str):
-        """Intelligently loads the desired model, unloading others if needed."""
-        console.print("\n[dim]Checking LM Studio server models...[/dim]")
-        
-        loaded_models = self.get_loaded_models()
-        
-        if not loaded_models:
-            console.print("[dim]No model loaded.[/dim]")
-            
-        # 1. Exact model is already loaded
-        if any(desired_model.lower() in m.lower() for m in loaded_models):
-            console.print(f"[green]Detected loaded model:[/green] {desired_model}")
-            console.print("[dim]Model already loaded — skipping load.[/dim]")
-            return
-            
-        # 2. Other models are loaded — need to unload first to prevent VRAM overflow
-        if loaded_models and not any(desired_model.lower() in m.lower() for m in loaded_models):
-            console.print(f"[yellow]Different models currently loaded: {', '.join(loaded_models)}[/yellow]")
-            self.unload_all_models()
-            
-        # 3. Load the target model
-        console.print(f"\n[cyan]Loading model:[/cyan] {desired_model} using preset Bringer_RAG...")
-        console.print("[dim](Please wait, this may take a moment)[/dim]")
-        
-        try:
-            subprocess.Popen(
-                ["lms", "load", desired_model, "--preset", "Bringer_RAG", "--gpu", "max"],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                shell=True
-            )
-        except Exception as e:
-            console.print(f"[bold red]Failed to execute model load sequence: {e}[/bold red]")
-            return
-            
-        # 4. Poll until the model appears in /v1/models
-        console.print("[cyan]Waiting for model to load[/cyan]", end="")
-        max_load_seconds = 90
-        t0 = time.time()
-        
-        model_loaded = False
-        while time.time() - t0 < max_load_seconds:
-            current_models = self.get_loaded_models()
-            if any(desired_model.lower() in m.lower() for m in current_models):
-                model_loaded = True
-                break
-            time.sleep(2)
-            print(".", end="", flush=True)
-            
-        if not model_loaded:
-            console.print("\n[bold red]Error: Timed out waiting for model to appear in LM Studio.[/bold red]")
-            return
-
-        console.print("\n[green]Model detected in /v1/models.[/green]")
-        console.print("[dim]Running readiness test...[/dim]")
-
-        # 5. Perform Readiness Check
-        t1 = time.time()
-        model_ready = False
-        # Give it a short window after appearing to be fully ready for generation
-        while time.time() - t1 < 30:
-            if self.is_model_ready_for_generation(desired_model):
-                model_ready = True
-                break
-            time.sleep(2)
-            
-        if model_ready:
-            console.print("[bold green]Model ready.[/bold green]")
+    def _log_loaded_models(self, loaded_models: List[str]):
+        if loaded_models:
+            console.print("[cyan]Loaded models detected:[/cyan]")
+            for model_name in loaded_models:
+                console.print(model_name)
         else:
-            console.print("[bold red]Error: Model appeared but failed readiness check.[/bold red]")
+            console.print("[dim]No loaded models detected.[/dim]")
+
+    def _run_lms_command(self, command: List[str], background: bool = False) -> bool:
+        try:
+            if background:
+                subprocess.Popen(
+                    command,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    shell=False,
+                )
+            else:
+                subprocess.run(
+                    command,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    shell=False,
+                    check=False,
+                )
+            return True
+        except Exception as e:
+            console.print(f"[bold red]Failed to execute {' '.join(command)}:[/bold red] {e}")
+            return False
+
+    def _wait_for_model_state(self, desired_model: str, should_exist: bool, timeout_seconds: float) -> bool:
+        deadline = time.time() + timeout_seconds
+
+        while time.time() < deadline:
+            loaded_models = self.get_loaded_models()
+            if should_exist and desired_model in loaded_models:
+                return True
+            if not should_exist and not loaded_models:
+                return True
+            time.sleep(self.model_poll_interval)
+
+        return False
+
+    def wait_for_model_ready(self, desired_model: str) -> bool:
+        """
+        Only probes readiness after the exact model is visible in /v1/models.
+        """
+        if desired_model not in self.get_loaded_models():
+            return False
+
+        console.print("[cyan]Running readiness probe...[/cyan]")
+        deadline = time.time() + self.readiness_timeout
+
+        while time.time() < deadline:
+            if self.is_model_ready_for_generation(desired_model):
+                console.print("[bold green]Model ready.[/bold green]")
+                return True
+            time.sleep(self.model_poll_interval)
+
+        console.print("[bold red]Error: Model appeared but failed readiness check.[/bold red]")
+        return False
+
+    def unload_all_models(self) -> bool:
+        """Unloads all currently loaded models using the LMS CLI to free VRAM."""
+        console.print("[yellow]Desired model not loaded.[/yellow]")
+        console.print("[cyan]Unloading current models...[/cyan]")
+
+        if not self._run_lms_command(["lms", "unload", "--all"]):
+            return False
+
+        if self._wait_for_model_state("", should_exist=False, timeout_seconds=self.unload_timeout):
+            return True
+
+        console.print("[bold red]Error: Timed out waiting for LM Studio to unload existing models.[/bold red]")
+        return False
+
+    def load_model(self, desired_model: str) -> bool:
+        """Ensures the exact desired model is loaded and ready."""
+        console.print("\n[cyan]Checking LM Studio server...[/cyan]")
+
+        loaded_models = self.get_loaded_models()
+        self._log_loaded_models(loaded_models)
+
+        if desired_model in loaded_models:
+            console.print(f"[green]Desired model already loaded:[/green] {desired_model}")
+            return self.wait_for_model_ready(desired_model)
+
+        if not self.unload_all_models():
+            return False
+
+        console.print(f"[cyan]Loading model:[/cyan] {desired_model} using preset Bringer_RAG...")
+        if not self._run_lms_command(
+            ["lms", "load", desired_model, "--preset", "Bringer_RAG"],
+            background=True,
+        ):
+            return False
+
+        console.print("[cyan]Waiting for model to load...[/cyan]")
+        if not self._wait_for_model_state(
+            desired_model,
+            should_exist=True,
+            timeout_seconds=self.model_load_timeout,
+        ):
+            console.print("\n[bold red]Error: Timed out waiting for model to appear in LM Studio.[/bold red]")
+            return False
+
+        console.print("[green]Model detected.[/green]")
+        return self.wait_for_model_ready(desired_model)
 
     def ensure_ready(self, selected_model: str):
         """Master orchestration: server check -> model check -> load logic."""
@@ -189,18 +214,16 @@ class LMStudioManager:
             self.start_server()
         else:
             console.print("[dim]Server running.[/dim]")
-            
-        self.load_model(selected_model)
+
+        if not self.load_model(selected_model):
+            sys.exit(1)
 
 
-# Quick standalone test
 if __name__ == "__main__":
     console.print("\n[bold magenta]--- LM Studio Manager Test ---[/bold magenta]")
-    
+
     manager = LMStudioManager()
-    
-    # Simulate hardware detection selecting a default
     test_model = "qwen2.5-7b-instruct"
     manager.ensure_ready(test_model)
-    
+
     console.print("\n[bold green]Manager test complete.[/bold green]")
