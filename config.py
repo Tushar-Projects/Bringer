@@ -77,7 +77,13 @@ KEYWORD_WEIGHT = 0.3                # Weight given to BM25 lexical matches
 # =============================================================================
 LLM_API_BASE = "http://localhost:1234/v1"
 LLM_API_CHAT_ENDPOINT = f"{LLM_API_BASE}/chat/completions"
-LLM_MODEL_NAME = "qwen2.5-7b-instruct"  # Must match model loaded in LM Studio
+
+# Dynamic Model Selection (based on hardware detection)
+LLM_MODEL_LARGE = "qwen2.5-7b-instruct"      # Plugged in + GPU
+LLM_MODEL_MEDIUM = "qwen2.5-3b-instruct"     # Battery + GPU
+LLM_MODEL_SMALL = "qwen2.5-1.5b-instruct"    # CPU only
+# Fallback/Default for legacy references:
+LLM_MODEL_NAME = "qwen2.5-7b-instruct"
 LLM_TEMPERATURE = 0.1                    # Low temp for factual RAG answers
 LLM_MAX_TOKENS = 1024                    # Max output tokens per response
 LLM_MAX_CONTEXT_TOKENS = 8192            # Max total prompt size context window
