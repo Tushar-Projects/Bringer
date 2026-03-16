@@ -21,7 +21,6 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '.
 import config
 from src.modules.retriever import Retriever
 from src.modules.vector_store import VectorStore
-from src.modules.logging_utils import debug_print
 
 console = Console()
 
@@ -49,7 +48,7 @@ class HybridRetriever:
         if current_count == self._last_doc_count and self._bm25_index is not None:
             return  # Cache hit
             
-        debug_print(f"[dim]Rebuilding BM25 lexical index for {current_count} documents...[/dim]")
+        console.print(f"[dim]Rebuilding BM25 lexical index for {current_count} documents...[/dim]")
         t0 = time.perf_counter()
         
         if current_count == 0:
@@ -73,7 +72,7 @@ class HybridRetriever:
         
         self._last_doc_count = current_count
         t_build = time.perf_counter() - t0
-        debug_print(f"[green]Built BM25 index in {t_build*1000:.1f}ms.[/green]")
+        console.print(f"[green]Built BM25 index in {t_build*1000:.1f}ms.[/green]")
 
     def keyword_search(self, query: str, k: int = config.BM25_TOP_K) -> Dict[str, Any]:
         """
@@ -126,7 +125,7 @@ class HybridRetriever:
         """
         t_start = time.perf_counter()
         
-        debug_print(f"\n[bold cyan]Hybrid Query:[/bold cyan] '{query}'")
+        console.print(f"\n[bold cyan]Hybrid Query:[/bold cyan] '{query}'")
         
         # 1. Execute Keyword Search
         t0 = time.perf_counter()
@@ -193,20 +192,20 @@ class HybridRetriever:
         num_keyword = len(keyword_results)
         num_merged = len(merged_chunks)
         
-        debug_print(f"Semantic results: {num_semantic}")
-        debug_print(f"Keyword results: {num_keyword}")
-        debug_print(f"Merged results: {num_merged}")
+        console.print(f"Semantic results: {num_semantic}")
+        console.print(f"Keyword results: {num_keyword}")
+        console.print(f"Merged results: {num_merged}")
         
         if final_results:
             best = final_results[0]
-            debug_print("\n[bold]Top result:[/bold]")
-            debug_print(f"semantic_score: {best['semantic_score']:.2f}")
-            debug_print(f"keyword_score: {best['keyword_score']:.2f}")
-            debug_print(f"final_score: [bold green]{best['final_score']:.2f}[/bold green]")
+            console.print("\n[bold]Top result:[/bold]")
+            console.print(f"semantic_score: {best['semantic_score']:.2f}")
+            console.print(f"keyword_score: {best['keyword_score']:.2f}")
+            console.print(f"final_score: [bold green]{best['final_score']:.2f}[/bold green]")
         else:
-            debug_print("[yellow]No relevant chunks found in either search.[/yellow]")
+            console.print("[yellow]No relevant chunks found in either search.[/yellow]")
             
-        debug_print(f"\n[dim]Timing: Semantic {t_sem*1000:.1f}ms | BM25 {t_key*1000:.1f}ms | Merge {t_merge*1000:.1f}ms | Total {t_total*1000:.1f}ms[/dim]")
+        console.print(f"\n[dim]Timing: Semantic {t_sem*1000:.1f}ms | BM25 {t_key*1000:.1f}ms | Merge {t_merge*1000:.1f}ms | Total {t_total*1000:.1f}ms[/dim]")
         
         return final_results
 

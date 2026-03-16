@@ -36,7 +36,6 @@ def get_device() -> str:
     return "cuda" if torch.cuda.is_available() else "cpu"
 
 FORCE_CPU = False  # Set True to force embeddings & reranker onto CPU
-DEBUG_MODE = False
 
 DEVICE = get_device()
 
@@ -81,7 +80,7 @@ LLM_API_CHAT_ENDPOINT = f"{LLM_API_BASE}/chat/completions"
 
 # Dynamic Model Selection (based on hardware detection)
 LLM_MODEL_LARGE = "qwen2.5-coder-7b-instruct"      # Plugged in + GPU
-LLM_MODEL_MEDIUM = "qwen2.5-3b-instruct"           # Battery + GPU
+LLM_MODEL_MEDIUM = "qwen2.5-3b-instruct"     # Battery + GPU
 LLM_MODEL_SMALL = "qwen2.5-coder-1.5b-instruct"    # CPU only
 # Fallback/Default for legacy references:
 LLM_MODEL_NAME = "qwen2.5-coder-7b-instruct"

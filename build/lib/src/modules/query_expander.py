@@ -18,7 +18,6 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '.
 import config
 
 from src.modules.llm_client import LLMClient
-from src.modules.logging_utils import debug_print
 
 console = Console()
 
@@ -58,7 +57,7 @@ class QueryExpander:
         queries = [query]  # Always include the exact original query first
         
         if not response_text:
-            debug_print(f"[dim]Query expansion failed, returning original query ({t_gen*1000:.1f}ms).[/dim]")
+            console.print(f"[dim]Query expansion failed, returning original query ({t_gen*1000:.1f}ms).[/dim]")
             return queries
             
         try:
@@ -80,11 +79,11 @@ class QueryExpander:
                     if valid_alt and valid_alt.lower() != query.lower():
                         queries.append(valid_alt)
                         
-            debug_print(f"[dim]Query expansion generated {len(queries)-1} variations ({t_gen*1000:.1f}ms).[/dim]")
+            console.print(f"[dim]Query expansion generated {len(queries)-1} variations ({t_gen*1000:.1f}ms).[/dim]")
             
         except json.JSONDecodeError:
-            debug_print(f"[yellow]Failed to parse query expansion JSON. Raw output: {response_text}[/yellow]")
-            debug_print(f"[dim]Returning original query only ({t_gen*1000:.1f}ms).[/dim]")
+            console.print(f"[yellow]Failed to parse query expansion JSON. Raw output: {response_text}[/yellow]")
+            console.print(f"[dim]Returning original query only ({t_gen*1000:.1f}ms).[/dim]")
             
         return queries
 

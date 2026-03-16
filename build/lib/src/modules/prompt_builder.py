@@ -17,7 +17,6 @@ import os
 # Add project root to path so we can import config
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 import config
-from src.modules.logging_utils import debug_print
 
 console = Console()
 
@@ -86,9 +85,9 @@ class PromptBuilder:
             # If adding this chunk exceeds our remaining budget, stop adding chunks
             if current_tokens + chunk_tokens > available_budget:
                 if chunks_used == 0:
-                    debug_print("[yellow]Warning: The first retrieved chunk is too large for the context window![/yellow]")
+                    console.print("[yellow]Warning: The first retrieved chunk is too large for the context window![/yellow]")
                 else:
-                    debug_print(f"[dim]Truncated prompt at {chunks_used} chunks to stay within {self.max_context_tokens} token limit.[/dim]")
+                    console.print(f"[dim]Truncated prompt at {chunks_used} chunks to stay within {self.max_context_tokens} token limit.[/dim]")
                 break
                 
             context_text += chunk_block
@@ -105,8 +104,8 @@ class PromptBuilder:
             {"role": "user", "content": user_prompt}
         ]
         
-        debug_print(f"[dim]Context chunks injected: {chunks_used}[/dim]")
-        debug_print(f"[dim]Prompt token estimate: ~{total_prompt_estimate}[/dim]")
+        console.print(f"[dim]Context chunks injected: {chunks_used}[/dim]")
+        console.print(f"[dim]Prompt token estimate: ~{total_prompt_estimate}[/dim]")
         
         return messages, total_prompt_estimate
 

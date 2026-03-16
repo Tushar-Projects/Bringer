@@ -18,7 +18,6 @@ import os
 # Add project root to path so we can import config
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 import config
-from src.modules.logging_utils import debug_print
 
 console = Console()
 
@@ -32,14 +31,14 @@ def get_embedding_model() -> SentenceTransformer:
     """Lazy loader for the embedding model to ensure it is only loaded once."""
     global _MODEL
     if _MODEL is None:
-        debug_print(f"[dim]Loading embedding model '{config.EMBEDDING_MODEL_NAME}' onto {config.DEVICE}...[/dim]")
+        console.print(f"[dim]Loading embedding model '{config.EMBEDDING_MODEL_NAME}' onto {config.DEVICE}...[/dim]")
         t0 = time.perf_counter()
         
         # Load the model directly onto the target device (GPU/CPU)
         _MODEL = SentenceTransformer(config.EMBEDDING_MODEL_NAME, device=config.DEVICE)
         
         load_time = time.perf_counter() - t0
-        debug_print(f"[green]Model loaded in {load_time:.2f}s.[/green]")
+        console.print(f"[green]Model loaded in {load_time:.2f}s.[/green]")
     return _MODEL
 
 class EmbeddingEngine:
@@ -84,7 +83,7 @@ class EmbeddingEngine:
         # Extract just the text contents to embed
         texts = [chunk["content"] for chunk in chunks]
         
-        debug_print(f"[dim]Generating embeddings for {len(texts)} chunks in batches of {self.batch_size}...[/dim]")
+        console.print(f"[dim]Generating embeddings for {len(texts)} chunks in batches of {self.batch_size}...[/dim]")
         t0 = time.perf_counter()
         
         # sentence-transformers automatically handles batching, memory mapping, 
@@ -103,8 +102,8 @@ class EmbeddingEngine:
         for i, chunk in enumerate(chunks):
             chunk["embedding"] = embeddings[i].tolist() # Convert numpy array to standard python list
             
-        debug_print(f"[green]Generated {len(texts)} embeddings in {t_embed:.2f}s "
-                    f"({len(texts)/t_embed:.1f} chunks/sec).[/green]")
+        console.print(f"[green]Generated {len(texts)} embeddings in {t_embed:.2f}s "
+                      f"({len(texts)/t_embed:.1f} chunks/sec).[/green]")
                       
         # Periodically clear CUDA cache if we processed a massive batch
         if config.DEVICE == "cuda" and len(texts) > self.batch_size * 5:
