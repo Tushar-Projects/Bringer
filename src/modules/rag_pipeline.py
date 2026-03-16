@@ -19,6 +19,8 @@ import config
 from src.modules.hybrid_retriever import HybridRetriever
 from src.modules.prompt_builder import PromptBuilder
 from src.modules.llm_client import LLMClient
+from src.modules.query_expander import QueryExpander
+from src.modules.reranker import Reranker
 
 console = Console()
 
@@ -30,6 +32,8 @@ class RAGPipeline:
         self.retriever = HybridRetriever()
         self.prompt_builder = PromptBuilder()
         self.llm_client = LLMClient()
+        self.expander = QueryExpander()
+        self.reranker = Reranker()
 
     def _extract_sources(self, chunks: List[Dict[str, Any]]) -> List[str]:
         """
@@ -59,20 +63,39 @@ class RAGPipeline:
         """
         console.print(f"\n[bold cyan]Query:[/bold cyan] [italic]{query}[/italic]")
         
-        # 1. Retrieval
+        # 1. Expand Query
         t0 = time.perf_counter()
-        chunks = self.retriever.retrieve(query)
+        expanded_queries = self.expander.expand_query(query)
+        t_exp = time.perf_counter() - t0
+        
+        # 2. Hybrid Retrieval for all queries
+        t0 = time.perf_counter()
+        raw_chunks = {}
+        for q in expanded_queries:
+            chunks = self.retriever.retrieve(q, k=config.HYBRID_TOP_K)
+            for chunk in chunks:
+                # Deduplicate by unique chunk ID
+                chunk_id = chunk.get("chunk_id", chunk["metadata"].get("chunk_id", str(hash(chunk["content"]))))
+                if chunk_id not in raw_chunks:
+                    raw_chunks[chunk_id] = chunk
+                    
+        unique_chunks = list(raw_chunks.values())
         t_retrieval = time.perf_counter() - t0
         
-        if not chunks:
+        if not unique_chunks:
             yield "\nNo relevant information was found in the indexed documents."
             return
             
-        console.print(f"[dim]Hybrid retrieval results: {len(chunks)} ({t_retrieval*1000:.1f}ms)[/dim]")
+        console.print(f"[dim]Hybrid retrieval returned {len(unique_chunks)} unique chunks ({t_retrieval*1000:.1f}ms)[/dim]")
         
-        # 2. Prompt Building
+        # 3. Reranking
         t0 = time.perf_counter()
-        messages, token_estimate = self.prompt_builder.build_prompt(query, chunks)
+        final_chunks = self.reranker.rerank(query, unique_chunks, top_k=config.FINAL_TOP_K)
+        t_rank = time.perf_counter() - t0
+        
+        # 4. Prompt Building
+        t0 = time.perf_counter()
+        messages, token_estimate = self.prompt_builder.build_prompt(query, final_chunks)
         t_prompt = time.perf_counter() - t0
         
         console.print(f"[dim]Prompt tokens: ~{token_estimate} ({t_prompt*1000:.1f}ms)[/dim]")
@@ -86,8 +109,8 @@ class RAGPipeline:
             yield f"\n\n[Error during LLM generation: {str(e)}]"
             return
             
-        # 4. Append Sources Citation
-        sources = self._extract_sources(chunks)
+        # 5. Append Sources Citation
+        sources = self._extract_sources(final_chunks)
         yield "\n\n[bold cyan]Sources:[/bold cyan]\n"
         for source in sources:
             yield f"• {source}\n"

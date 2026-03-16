@@ -28,8 +28,9 @@ class Retriever:
     def __init__(self):
         """Initializes the retriever, connecting to the vector store and embedding model."""
         self.vector_store = VectorStore()
-        # Grab the global singleton model so it isn't redundantly loaded
-        self.embedding_model = get_embedding_model()
+        # Grab the updated EmbeddingEngine to use its LRU cached embed_query method
+        from src.modules.embedding_engine import EmbeddingEngine
+        self.embedding_engine = EmbeddingEngine()
         self.min_score = config.MIN_SIMILARITY_SCORE
 
     def retrieve(self, query: str, k: int = config.SEMANTIC_TOP_K) -> List[Dict[str, Any]]:
@@ -49,15 +50,9 @@ class Retriever:
 
         console.print(f"\n[bold cyan]Query:[/bold cyan] '{query}'")
         
-        # 1. Embed the query (using the same global model from Phase 4)
+        # 1. Embed the query (utilizes LRU cache to save time on identical sub-queries)
         t0 = time.perf_counter()
-        # convert_to_tensor=False ensures it returns a standard numpy array
-        query_embedding = self.embedding_model.encode(
-            query,
-            show_progress_bar=False,
-            convert_to_tensor=False,
-            normalize_embeddings=True 
-        ).tolist()
+        query_embedding = self.embedding_engine.embed_query(query)
         t_embed = time.perf_counter() - t0
         
         # 2. Search Vector DB

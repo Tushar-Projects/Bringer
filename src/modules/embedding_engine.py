@@ -11,6 +11,7 @@ import torch
 from typing import List, Dict, Any
 from rich.console import Console
 from sentence_transformers import SentenceTransformer
+from functools import lru_cache
 
 import sys
 import os
@@ -45,6 +46,25 @@ class EmbeddingEngine:
         """Initialize the Embedding Engine (loads model implicitly via singleton)."""
         self.model = get_embedding_model()
         self.batch_size = config.EMBEDDING_BATCH_SIZE
+
+    @lru_cache(maxsize=128)
+    def embed_query(self, query: str) -> List[float]:
+        """
+        Embeds a single query string. Cached using LRU to prevent repeated computation.
+        
+        Args:
+            query: The user's text query.
+            
+        Returns:
+            A list of floats representing the dense vector.
+        """
+        embedding = self.model.encode(
+            query,
+            show_progress_bar=False,
+            convert_to_tensor=False,
+            normalize_embeddings=True 
+        )
+        return embedding.tolist()
 
     @torch.no_grad()
     def generate_embeddings(self, chunks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
