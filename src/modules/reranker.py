@@ -39,9 +39,16 @@ def get_reranker_model() -> CrossEncoder:
 class Reranker:
     def __init__(self):
         self.model = get_reranker_model()
+        self.min_score = config.RERANK_MIN_SCORE
 
     @torch.no_grad()
-    def rerank(self, query: str, chunks: List[Dict[str, Any]], top_k: int = config.FINAL_TOP_K) -> List[Dict[str, Any]]:
+    def rerank(
+        self,
+        query: str,
+        chunks: List[Dict[str, Any]],
+        top_k: int = config.FINAL_TOP_K,
+        min_score: float | None = None,
+    ) -> List[Dict[str, Any]]:
         """
         Takes a list of candidate chunks and scores them against the query.
         
@@ -55,6 +62,8 @@ class Reranker:
         """
         if not chunks:
             return []
+
+        threshold = self.min_score if min_score is None else min_score
 
         if len(chunks) == 1:
             chunks[0]["rerank_score"] = 1.0 # arbitrary default for single chunks
@@ -75,8 +84,7 @@ class Reranker:
             chunk["rerank_score"] = float(score)
             
         chunks.sort(key=lambda x: x["rerank_score"], reverse=True)
-        
-        top_chunks = chunks[:top_k]
+        top_chunks = [chunk for chunk in chunks if chunk["rerank_score"] >= threshold][:top_k]
         
         t_rank = time.perf_counter() - t0
         debug_print(f"[dim]Reranker reduced {len(chunks)} down to Top {len(top_chunks)} ({t_rank*1000:.1f}ms).[/dim]")

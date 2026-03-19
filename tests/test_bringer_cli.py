@@ -18,70 +18,53 @@ class BringerCliTests(unittest.TestCase):
         self.watcher = Mock()
         self.pipeline = Mock()
         self.pipeline.run_rag.return_value = iter(("Answer text", "\n\nSources\n", "- doc.txt\n"))
-        self.vector_store = Mock()
-        self.vector_store.get_stats.return_value = {"total_documents": 71}
+        self.runtime_modules = (
+            lambda: self.watcher,
+            lambda: self.hardware_detector,
+            lambda: self.lm_manager,
+            lambda: self.pipeline,
+        )
 
     @patch("bringer_cli.print")
     @patch("bringer_cli.console.print")
-    @patch("bringer_cli.VectorStore")
-    @patch("bringer_cli.RAGPipeline")
-    @patch("bringer_cli.DocumentWatcher")
-    @patch("bringer_cli.LMStudioManager")
-    @patch("bringer_cli.HardwareDetector")
+    @patch("bringer_cli._check_lmstudio_cli", return_value=True)
+    @patch("bringer_cli._load_runtime_modules")
     @patch("builtins.input", side_effect=["exit"])
-    def test_default_mode_shows_clean_startup_and_exit(
+    def test_default_mode_shows_minimal_startup_and_exit(
         self,
         _input,
-        hardware_detector_cls,
-        lm_manager_cls,
-        watcher_cls,
-        pipeline_cls,
-        vector_store_cls,
+        load_runtime_modules,
+        _check_lms,
         console_print,
         _print,
     ):
-        hardware_detector_cls.return_value = self.hardware_detector
-        lm_manager_cls.return_value = self.lm_manager
-        watcher_cls.return_value = self.watcher
-        pipeline_cls.return_value = self.pipeline
-        vector_store_cls.return_value = self.vector_store
+        load_runtime_modules.return_value = self.runtime_modules
 
         bringer_cli.launch_bringer([])
 
         text_calls = [args[0] for args, _ in console_print.call_args_list if args]
         self.assertIn("Bringer AI Assistant\n", text_calls)
         self.assertIn("Model: qwen2.5-coder-7b-instruct (GPU)", text_calls)
-        self.assertIn("Documents indexed: 71\n", text_calls)
         self.assertIn("Ready.", text_calls)
-        self.assertIn("Ask a question or type 'exit'.", text_calls)
         self.assertIn("Shutting down Bringer...", text_calls)
-        self.assertNotIn("[dim]Detecting hardware...[/dim]", text_calls)
+        self.assertNotIn("Documents indexed: 71\n", text_calls)
+        self.assertNotIn("Ask a question or type 'exit'.", text_calls)
         self.assertNotIn("[bold cyan]Answer:[/bold cyan] ", text_calls)
 
     @patch("bringer_cli.print")
     @patch("bringer_cli.console.print")
-    @patch("bringer_cli.VectorStore")
-    @patch("bringer_cli.RAGPipeline")
-    @patch("bringer_cli.DocumentWatcher")
-    @patch("bringer_cli.LMStudioManager")
-    @patch("bringer_cli.HardwareDetector")
+    @patch("bringer_cli._check_lmstudio_cli", return_value=True)
+    @patch("bringer_cli._load_runtime_modules")
     @patch("builtins.input", side_effect=["question", "exit"])
     def test_default_mode_streams_answer_without_answer_label(
         self,
         _input,
-        hardware_detector_cls,
-        lm_manager_cls,
-        watcher_cls,
-        pipeline_cls,
-        vector_store_cls,
+        load_runtime_modules,
+        _check_lms,
         console_print,
         print_mock,
     ):
-        hardware_detector_cls.return_value = self.hardware_detector
-        lm_manager_cls.return_value = self.lm_manager
-        watcher_cls.return_value = self.watcher
-        pipeline_cls.return_value = self.pipeline
-        vector_store_cls.return_value = self.vector_store
+        load_runtime_modules.return_value = self.runtime_modules
 
         bringer_cli.launch_bringer([])
 
@@ -93,28 +76,18 @@ class BringerCliTests(unittest.TestCase):
 
     @patch("bringer_cli.print")
     @patch("bringer_cli.console.print")
-    @patch("bringer_cli.VectorStore")
-    @patch("bringer_cli.RAGPipeline")
-    @patch("bringer_cli.DocumentWatcher")
-    @patch("bringer_cli.LMStudioManager")
-    @patch("bringer_cli.HardwareDetector")
+    @patch("bringer_cli._check_lmstudio_cli", return_value=True)
+    @patch("bringer_cli._load_runtime_modules")
     @patch("builtins.input", side_effect=["exit"])
     def test_debug_mode_keeps_verbose_banner(
         self,
         _input,
-        hardware_detector_cls,
-        lm_manager_cls,
-        watcher_cls,
-        pipeline_cls,
-        vector_store_cls,
+        load_runtime_modules,
+        _check_lms,
         console_print,
         _print,
     ):
-        hardware_detector_cls.return_value = self.hardware_detector
-        lm_manager_cls.return_value = self.lm_manager
-        watcher_cls.return_value = self.watcher
-        pipeline_cls.return_value = self.pipeline
-        vector_store_cls.return_value = self.vector_store
+        load_runtime_modules.return_value = self.runtime_modules
 
         bringer_cli.launch_bringer(["--debug"])
 
@@ -123,18 +96,26 @@ class BringerCliTests(unittest.TestCase):
         self.assertTrue(any("RAG Assistant Ready" in text for text in text_calls))
         self.assertIn("Ask a question (type 'exit' or 'quit' to close)", text_calls)
 
-    @patch("bringer_cli.VectorStore")
-    @patch("bringer_cli.RAGPipeline")
-    @patch("bringer_cli.DocumentWatcher")
-    @patch("bringer_cli.LMStudioManager")
-    @patch("bringer_cli.HardwareDetector")
+    @patch("bringer_cli._check_lmstudio_cli", return_value=False)
+    @patch("bringer_cli._load_runtime_modules")
+    def test_launch_bringer_stops_early_when_lmstudio_cli_is_missing(self, load_runtime_modules, _check_lms):
+        load_runtime_modules.return_value = self.runtime_modules
+
+        bringer_cli.launch_bringer([])
+
+        self.lm_manager.ensure_ready.assert_not_called()
+
+    @patch("bringer_cli._load_runtime_modules", return_value=None)
+    def test_launch_bringer_stops_early_when_runtime_imports_fail(self, _load_runtime_modules):
+        bringer_cli.launch_bringer([])
+
+        self.lm_manager.ensure_ready.assert_not_called()
+
+    @patch("bringer_cli._check_lmstudio_cli", return_value=True)
+    @patch("bringer_cli._load_runtime_modules")
     @patch("builtins.input", side_effect=["exit"])
-    def test_exit_triggers_shutdown(self, _input, hardware_detector_cls, lm_manager_cls, watcher_cls, pipeline_cls, vector_store_cls):
-        hardware_detector_cls.return_value = self.hardware_detector
-        lm_manager_cls.return_value = self.lm_manager
-        watcher_cls.return_value = self.watcher
-        pipeline_cls.return_value = self.pipeline
-        vector_store_cls.return_value = self.vector_store
+    def test_exit_triggers_shutdown(self, _input, load_runtime_modules, _check_lms):
+        load_runtime_modules.return_value = self.runtime_modules
 
         with patch("bringer_cli.shutdown_bringer") as shutdown_bringer:
             bringer_cli.launch_bringer([])
@@ -143,41 +124,142 @@ class BringerCliTests(unittest.TestCase):
         self.watcher.start.assert_called_once()
         shutdown_bringer.assert_called_once_with(self.watcher, self.lm_manager)
 
-    @patch("bringer_cli.VectorStore")
-    @patch("bringer_cli.RAGPipeline")
-    @patch("bringer_cli.DocumentWatcher")
-    @patch("bringer_cli.LMStudioManager")
-    @patch("bringer_cli.HardwareDetector")
+    @patch("bringer_cli._check_lmstudio_cli", return_value=True)
+    @patch("bringer_cli._load_runtime_modules")
     @patch("builtins.input", side_effect=["quit"])
-    def test_quit_triggers_shutdown(self, _input, hardware_detector_cls, lm_manager_cls, watcher_cls, pipeline_cls, vector_store_cls):
-        hardware_detector_cls.return_value = self.hardware_detector
-        lm_manager_cls.return_value = self.lm_manager
-        watcher_cls.return_value = self.watcher
-        pipeline_cls.return_value = self.pipeline
-        vector_store_cls.return_value = self.vector_store
+    def test_quit_triggers_shutdown(self, _input, load_runtime_modules, _check_lms):
+        load_runtime_modules.return_value = self.runtime_modules
 
         with patch("bringer_cli.shutdown_bringer") as shutdown_bringer:
             bringer_cli.launch_bringer([])
 
         shutdown_bringer.assert_called_once_with(self.watcher, self.lm_manager)
 
-    @patch("bringer_cli.VectorStore")
-    @patch("bringer_cli.RAGPipeline")
-    @patch("bringer_cli.DocumentWatcher")
-    @patch("bringer_cli.LMStudioManager")
-    @patch("bringer_cli.HardwareDetector")
+    @patch("bringer_cli._check_lmstudio_cli", return_value=True)
+    @patch("bringer_cli._load_runtime_modules")
     @patch("builtins.input", side_effect=KeyboardInterrupt)
-    def test_ctrl_c_triggers_shutdown(self, _input, hardware_detector_cls, lm_manager_cls, watcher_cls, pipeline_cls, vector_store_cls):
-        hardware_detector_cls.return_value = self.hardware_detector
-        lm_manager_cls.return_value = self.lm_manager
-        watcher_cls.return_value = self.watcher
-        pipeline_cls.return_value = self.pipeline
-        vector_store_cls.return_value = self.vector_store
+    def test_ctrl_c_triggers_shutdown(self, _input, load_runtime_modules, _check_lms):
+        load_runtime_modules.return_value = self.runtime_modules
 
         with patch("bringer_cli.shutdown_bringer") as shutdown_bringer:
             bringer_cli.launch_bringer([])
 
         shutdown_bringer.assert_called_once_with(self.watcher, self.lm_manager)
+
+    @patch("bringer_cli.console.print")
+    @patch("src.modules.hybrid_retriever.HybridRetriever")
+    @patch("src.modules.vector_store.VectorStore")
+    @patch("bringer_cli.Path")
+    def test_run_reindex_mode_clears_db_reindexes_supported_files_and_rebuilds_bm25(
+        self,
+        path_cls,
+        vector_store_cls,
+        hybrid_retriever_cls,
+        console_print,
+    ):
+        store = Mock()
+        vector_store_cls.return_value = store
+        hybrid_retriever = Mock()
+        hybrid_retriever_cls.return_value = hybrid_retriever
+
+        file1 = Mock()
+        file1.is_file.return_value = True
+        file1.suffix = ".pdf"
+        file1.name = "file1.pdf"
+
+        file2 = Mock()
+        file2.is_file.return_value = True
+        file2.suffix = ".docx"
+        file2.name = "file2.docx"
+
+        ignored = Mock()
+        ignored.is_file.return_value = True
+        ignored.suffix = ".exe"
+        ignored.name = "ignore.exe"
+
+        docs_path = Mock()
+        docs_path.iterdir.return_value = [file1, file2, ignored]
+        path_cls.return_value = docs_path
+
+        bringer_cli.run_reindex_mode()
+
+        store.clear.assert_called_once()
+        store.process_file.assert_any_call(file1)
+        store.process_file.assert_any_call(file2)
+        self.assertEqual(store.process_file.call_count, 2)
+        hybrid_retriever.rebuild_bm25_index.assert_called_once()
+        text_calls = [args[0] for args, _ in console_print.call_args_list if args]
+        self.assertIn("Reindexing documents...", text_calls)
+        self.assertIn("Indexing file1.pdf...", text_calls)
+        self.assertIn("Indexing file2.docx...", text_calls)
+        self.assertIn("Reindex complete. 2 files processed.", text_calls)
+
+    @patch("bringer_cli.console.print")
+    @patch("src.modules.lmstudio_manager.LMStudioManager")
+    @patch("src.modules.vector_store.VectorStore")
+    def test_run_status_prints_index_and_model_status(self, vector_store_cls, lm_manager_cls, console_print):
+        store = Mock()
+        store.collection.count.return_value = 4
+        store.collection.get.return_value = {
+            "metadatas": [
+                {"source_file": "a.pdf"},
+                {"source_file": "b.docx"},
+                {"source_file": "a.pdf"},
+            ]
+        }
+        vector_store_cls.return_value = store
+
+        lm_manager = Mock()
+        lm_manager.get_loaded_models.return_value = ["qwen2.5-coder-7b-instruct"]
+        lm_manager_cls.return_value = lm_manager
+
+        bringer_cli.run_status()
+
+        text_calls = [args[0] for args, _ in console_print.call_args_list if args]
+        self.assertIn("Bringer Status\n", text_calls)
+        self.assertIn("Indexed files: 2", text_calls)
+        self.assertIn("Total chunks: 4\n", text_calls)
+        self.assertIn("Files:", text_calls)
+        self.assertIn("- a.pdf", text_calls)
+        self.assertIn("- b.docx", text_calls)
+        self.assertIn("\nActive model:", text_calls)
+        self.assertIn("- qwen2.5-coder-7b-instruct", text_calls)
+
+    @patch("bringer_cli.run_status")
+    def test_status_flag_runs_status_mode_and_exits(self, run_status):
+        bringer_cli.launch_bringer(["--status"])
+        run_status.assert_called_once()
+
+    @patch("bringer_cli.console.print")
+    def test_show_help_prints_clean_help_menu(self, console_print):
+        bringer_cli.show_help()
+
+        text_calls = [args[0] for args, _ in console_print.call_args_list if args]
+        self.assertIn("[bold cyan]Bringer - Local AI Document Assistant[/bold cyan]\n", text_calls)
+        self.assertIn("Usage:", text_calls)
+        self.assertIn("  Bringer                 Start the assistant", text_calls)
+        self.assertIn("  Bringer --debug         Run with detailed logs", text_calls)
+        self.assertIn("  Bringer --status        Show indexed files and system status", text_calls)
+        self.assertIn("  Bringer --reindex       Rebuild the document index", text_calls)
+        self.assertIn("  Bringer --help          Show this help message\n", text_calls)
+        self.assertIn("Description:", text_calls)
+        self.assertIn("Examples:", text_calls)
+
+    @patch("bringer_cli.show_help")
+    @patch("bringer_cli._load_runtime_modules")
+    def test_help_flag_runs_help_mode_and_exits(self, load_runtime_modules, show_help):
+        bringer_cli.launch_bringer(["--help"])
+
+        show_help.assert_called_once()
+        load_runtime_modules.assert_not_called()
+
+    @patch("bringer_cli.show_help")
+    @patch("bringer_cli._load_runtime_modules")
+    def test_short_help_flag_runs_help_mode_and_exits(self, load_runtime_modules, show_help):
+        bringer_cli.launch_bringer(["-h"])
+
+        show_help.assert_called_once()
+        load_runtime_modules.assert_not_called()
 
     def test_shutdown_bringer_stops_watcher_and_invokes_lm_shutdown(self):
         watcher = Mock()

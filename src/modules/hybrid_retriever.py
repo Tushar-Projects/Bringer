@@ -43,6 +43,12 @@ class HybridRetriever:
         # Preload BM25
         self._load_bm25_index_if_needed()
 
+    def rebuild_bm25_index(self):
+        """Forces the BM25 cache to rebuild from the current vector database."""
+        self._bm25_index = None
+        self._last_doc_count = -1
+        self._load_bm25_index_if_needed()
+
     def _load_bm25_index_if_needed(self):
         """Loads or rebuilds the BM25 lexical index only if the vector database has changed."""
         current_count = self.vector_store.collection.count()
@@ -120,7 +126,13 @@ class HybridRetriever:
             
         return results_dict
 
-    def retrieve(self, query: str, k: int = config.HYBRID_TOP_K) -> List[Dict[str, Any]]:
+    def retrieve(
+        self,
+        query: str,
+        k: int = config.HYBRID_TOP_K,
+        semantic_top_k: int | None = None,
+        min_score: float | None = None,
+    ) -> List[Dict[str, Any]]:
         """
         Executes both Semantic and Lexical searches, merges results, and scores them.
         """
@@ -136,7 +148,11 @@ class HybridRetriever:
         # 2. Execute Semantic Search 
         # (Pass large k here so we get good candidate pools to merge, we trim at the end)
         t0 = time.perf_counter()
-        semantic_results = self.semantic_retriever.retrieve(query, k=config.SEMANTIC_TOP_K)
+        semantic_results = self.semantic_retriever.retrieve(
+            query,
+            k=config.SEMANTIC_TOP_K if semantic_top_k is None else semantic_top_k,
+            min_score=min_score,
+        )
         t_sem = time.perf_counter() - t0
         
         # 3. Merge and deduplicate

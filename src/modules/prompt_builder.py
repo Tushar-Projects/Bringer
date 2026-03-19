@@ -32,20 +32,26 @@ class PromptBuilder:
         
         # Base system instruction used for all RAG queries
         self.system_prompt = (
-            "You are a highly capable and helpful AI assistant answering questions based strictly on the provided context.\n\n"
+            "You are a precise document extractor.\n\n"
             "INSTRUCTIONS:\n"
-            "1. You MUST use ONLY the information in the provided context to answer the question.\n"
-            "2. If the answer cannot be found in the context, say exactly: \"I could not find the answer in the provided documents.\"\n"
-            "3. Do not rely on outside knowledge or invent information.\n"
-            "4. When providing facts, cite the source document name in brackets, e.g., [Source: document.pdf].\n"
-            "5. Be concise, clear, and professional."
+            "1. You MUST extract the answer strictly from the provided context.\n"
+            "2. Do NOT invent facts or use outside knowledge.\n"
+            "3. If the context is a strong match, return the exact sentence or exact lines that answer the question.\n"
+            "4. If the context is only a moderate match, return the closest relevant sentence without adding new facts.\n"
+            "5. If the answer is not explicitly or closely present, respond exactly: \"I could not find the exact answer in the documents.\"\n"
+            "6. Do not combine unrelated chunks or pages."
         )
 
     def _estimate_tokens(self, text: str) -> int:
         """Fast approximation of token count."""
         return len(_TOKENIZER.encode(text))
 
-    def build_prompt(self, query: str, retrieved_chunks: List[Dict[str, Any]]) -> Tuple[List[Dict[str, str]], int]:
+    def build_prompt(
+        self,
+        query: str,
+        retrieved_chunks: List[Dict[str, Any]],
+        confidence_mode: str = "high",
+    ) -> Tuple[List[Dict[str, str]], int]:
         """
         Constructs the final prompt array and enforces token safety limits.
         
@@ -58,7 +64,21 @@ class PromptBuilder:
         """
         # 1. Base tokens calculation
         system_tokens = self._estimate_tokens(self.system_prompt)
-        query_format = f"\n\n---\n\nQUESTION:\n{query}\n\nAnswer clearly and concisely. If possible, cite the source document names."
+        if confidence_mode == "moderate":
+            answer_instruction = (
+                "Return the closest relevant sentence(s) from the context that answer the question. "
+                "Stay grounded in the provided text and do not add new facts. "
+                "If no relevant text exists, return exactly: "
+                "\"I could not find the exact answer in the documents.\""
+            )
+        else:
+            answer_instruction = (
+                "Return the exact sentence(s) from the context that answer the question. "
+                "If no exact answer exists in the context, return exactly: "
+                "\"I could not find the exact answer in the documents.\""
+            )
+
+        query_format = f"\n\n---\n\nQUESTION:\n{query}\n\n{answer_instruction}"
         query_tokens = self._estimate_tokens(query_format)
         
         # 2. Add chunks until we hit the context safety limit
@@ -77,9 +97,9 @@ class PromptBuilder:
             chunk_content = chunk.get("content", "").strip()
             
             if page_number is not None:
-                chunk_block = f"\n[Source: {source_file} | page {page_number} | chunk {chunk_index}]\n{chunk_content}\n"
+                chunk_block = f"\n[Source: {source_file} | page {page_number}]\n{chunk_content}\n"
             else:
-                chunk_block = f"\n[Source: {source_file} | chunk {chunk_index}]\n{chunk_content}\n"
+                chunk_block = f"\n[Source: {source_file}]\n{chunk_content}\n"
                 
             chunk_tokens = self._estimate_tokens(chunk_block)
             

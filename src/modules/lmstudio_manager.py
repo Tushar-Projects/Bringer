@@ -74,12 +74,12 @@ class LMStudioManager:
         console.print("\n[bold red]Error: LM Studio server failed to start or timed out.[/bold red]")
         sys.exit(1)
 
-    def stop_server(self):
+    def shutdown(self):
         """Stops the LM Studio server only if this process started it."""
         if not self.started_by_bringer:
             return
 
-            debug_print("[dim]Stopping LM Studio server...[/dim]")
+        console.print("Stopping LM Studio server...")
         try:
             subprocess.run(
                 ["lms", "server", "stop"],
@@ -88,9 +88,13 @@ class LMStudioManager:
                 shell=False,
                 check=False,
             )
-            debug_print("[dim]LM Studio server stopped.[/dim]")
+            console.print("LM Studio server stopped.")
         except Exception:
-            console.print("[yellow]Failed to stop LM Studio server.[/yellow]")
+            console.print("Warning: Failed to stop LM Studio server.")
+
+    def stop_server(self):
+        """Backward-compatible alias for centralized shutdown."""
+        self.shutdown()
 
     def get_loaded_models(self) -> List[str]:
         """Queries the API to return a list of currently loaded model IDs."""
