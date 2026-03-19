@@ -85,7 +85,7 @@ Answer:
 "A watchdog timer is an electronic or software timer used to detect system failures."
 
 Sources:
-- Module_2.pdf (page 17)
+- watchdog_test.txt (page 1)
 ```
 
 The goal is not to sound clever. The goal is to give you the closest grounded answer Bringer can find in your files, and show where it came from.
@@ -94,7 +94,7 @@ The goal is not to sound clever. The goal is to give you the closest grounded an
 
 At a high level, Bringer follows a pretty simple pipeline:
 
-1. Documents are read from the `documents/` folder and broken into smaller chunks.
+1. Documents are read from the `documents/` folder of the project and broken into smaller chunks.
 2. Those chunks are indexed for both semantic search and keyword search.
 3. When you ask a question, Bringer retrieves the most relevant matches from both methods.
 4. The results are reranked so the strongest evidence rises to the top.
