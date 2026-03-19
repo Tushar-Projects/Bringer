@@ -40,6 +40,15 @@ class VectorStore:
             metadata={"description": "Bringer RAG Document Embeddings"}
         )
 
+    def clear(self):
+        """Clears the entire vector database collection."""
+        console.print("Clearing vector database...")
+        existing = self.collection.get(include=[])
+        ids = existing.get("ids", []) if existing else []
+        if ids:
+            self.collection.delete(ids=ids)
+        console.print("Database cleared.")
+
     def _get_file_hash(self, file_path: Path | str) -> str:
         """
         Calculates a SHA-256 hash of a file's contents to detect modifications.
@@ -154,6 +163,33 @@ class VectorStore:
         t_store = time.perf_counter() - t0
         debug_print(f"[green]Stored {len(ids)} vectors in ChromaDB ({t_store*1000:.1f}ms).[/green]")
         return True
+
+    def process_file(self, file_path: Path | str) -> bool:
+        """
+        Runs the full indexing pipeline for a single file and stores its chunks.
+        Returns True when indexing succeeds.
+        """
+        from src.modules.document_loader import DocumentLoader
+        from src.modules.chunking_engine import ChunkingEngine
+        from src.modules.embedding_engine import EmbeddingEngine
+
+        path = Path(file_path)
+        self.remove_file(path)
+
+        loader = DocumentLoader()
+        chunker = ChunkingEngine()
+        embedder = EmbeddingEngine()
+
+        pages = loader.load_document(path)
+        if not pages:
+            return False
+
+        chunks = chunker.chunk_documents(pages)
+        if not chunks:
+            return False
+
+        embedded_chunks = embedder.generate_embeddings(chunks)
+        return self.add_chunks(embedded_chunks, path)
 
     def semantic_search(self, query_embedding: List[float], n_results: int = config.SEMANTIC_TOP_K) -> Dict[str, Any]:
         """

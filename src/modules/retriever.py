@@ -34,7 +34,7 @@ class Retriever:
         self.embedding_engine = EmbeddingEngine()
         self.min_score = config.MIN_SIMILARITY_SCORE
 
-    def retrieve(self, query: str, k: int = config.SEMANTIC_TOP_K) -> List[Dict[str, Any]]:
+    def retrieve(self, query: str, k: int = config.SEMANTIC_TOP_K, min_score: float | None = None) -> List[Dict[str, Any]]:
         """
         Embeds a user query, searches ChromaDB, and returns scored and filtered chunks.
         
@@ -48,6 +48,8 @@ class Retriever:
         if not query or not query.strip():
             debug_print("[yellow]Empty query provided to retriever.[/yellow]")
             return []
+
+        threshold = self.min_score if min_score is None else min_score
 
         debug_print(f"\n[bold cyan]Query:[/bold cyan] '{query}'")
         
@@ -89,7 +91,7 @@ class Retriever:
             score = max(0.0, min(1.0, score))
             
             # 4. Apply threshold filter
-            if score >= self.min_score:
+            if score >= threshold:
                 formatted_results.append({
                     "content": doc,
                     "metadata": meta,
@@ -105,11 +107,11 @@ class Retriever:
             top_score = formatted_results[0]["score"]
             avg_score = sum(r["score"] for r in formatted_results) / len(formatted_results)
             debug_print(f"[green]Retrieved {len(formatted_results)} chunks[/green] "
-                        f"(Discarded {len(distances) - len(formatted_results)} below threshold {self.min_score})")
+                        f"(Discarded {len(distances) - len(formatted_results)} below threshold {threshold})")
             debug_print(f"Top similarity score: [bold green]{top_score:.4f}[/bold green]")
             debug_print(f"Average score: [cyan]{avg_score:.4f}[/cyan]")
         else:
-            debug_print(f"[yellow]No chunks met the minimum similarity threshold ({self.min_score}).[/yellow]")
+            debug_print(f"[yellow]No chunks met the minimum similarity threshold ({threshold}).[/yellow]")
             
         debug_print(f"[dim]Timing: Embed {t_embed*1000:.1f}ms | Search {t_search*1000:.1f}ms | Process {t_process*1000:.1f}ms[/dim]")
         

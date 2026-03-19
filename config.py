@@ -51,24 +51,31 @@ EMBEDDING_DIMENSIONS = 384          # Output dimensions of the embedding model
 # Reranker Model
 # =============================================================================
 RERANKER_MODEL_NAME = "cross-encoder/ms-marco-MiniLM-L-6-v2"
-RERANKER_TOP_K = 5                  # Number of results after reranking
+RERANKER_TOP_K = 3                  # Number of results after reranking
+RERANK_MIN_SCORE = 0.55             # Default minimum reranker score required to keep a chunk
+STRICT_RERANK_MIN_SCORE = 0.7
+RELAXED_RERANK_MIN_SCORE = 0.4
 
 # =============================================================================
 # Chunking
 # =============================================================================
-CHUNK_SIZE_TOKENS = 600             # Target chunk size in tokens
-CHUNK_OVERLAP_TOKENS = 80           # Overlap between consecutive chunks (tokens)
+CHUNK_SIZE_TOKENS = 400             # Target chunk size in tokens
+CHUNK_OVERLAP_TOKENS = 50           # Overlap between consecutive chunks (tokens)
 # Recursive splitting hierarchy (preserves paragraphs and sentences before words)
 CHUNK_SEPARATORS = ["\n\n", "\n", ". ", "? ", "! ", " ", ""]
 
 # =============================================================================
 # Retrieval
 # =============================================================================
-SEMANTIC_TOP_K = 5                  # Default top-k results from vector search
-MIN_SIMILARITY_SCORE = 0.55         # Minimum score threshold (0-1) to keep a chunk
+SEMANTIC_TOP_K = 3                  # Default top-k results from vector search
+MIN_SIMILARITY_SCORE = 0.45         # Default minimum score threshold (0-1) to keep a chunk
+STRICT_MIN_SIMILARITY_SCORE = 0.6
+RELAXED_MIN_SIMILARITY_SCORE = 0.3
 BM25_TOP_K = 20                     # Top-k results from BM25 keyword search
-HYBRID_TOP_K = 5                    # Merged results before reranking
-FINAL_TOP_K = 5                     # Results sent to LLM after reranking
+HYBRID_TOP_K = 3                    # Merged results before reranking
+FINAL_TOP_K = 3                     # Results sent to LLM after reranking
+STRICT_FINAL_TOP_K = 3
+RELAXED_FINAL_TOP_K = 5
 
 SEMANTIC_WEIGHT = 0.7               # Weight given to vector similarity
 KEYWORD_WEIGHT = 0.3                # Weight given to BM25 lexical matches
