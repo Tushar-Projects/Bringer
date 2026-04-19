@@ -63,8 +63,6 @@ class Reranker:
         if not chunks:
             return []
 
-        threshold = self.min_score if min_score is None else min_score
-
         if len(chunks) == 1:
             chunks[0]["rerank_score"] = 1.0 # arbitrary default for single chunks
             return chunks
@@ -84,7 +82,9 @@ class Reranker:
             chunk["rerank_score"] = float(score)
             
         chunks.sort(key=lambda x: x["rerank_score"], reverse=True)
-        top_chunks = [chunk for chunk in chunks if chunk["rerank_score"] >= threshold][:top_k]
+        top_chunks = chunks[:top_k]
+        if len(top_chunks) == 0:
+            top_chunks = chunks[:top_k]
         
         t_rank = time.perf_counter() - t0
         debug_print(f"[dim]Reranker reduced {len(chunks)} down to Top {len(top_chunks)} ({t_rank*1000:.1f}ms).[/dim]")

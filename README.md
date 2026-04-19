@@ -46,9 +46,9 @@ Before running Bringer, make sure you have:
 
 Bringer currently selects from these locally installed models:
 
-- `Qwen2.5-7B-Instruct-1M-Q6_K`
+- `qwen2.5-7b`
 - `qwen2.5-3b-instruct`
-- `gemma-4-E2B-it-Q4_K_M`
+- `google/gemma-4-e2b`
 
 You can confirm what is installed with:
 
@@ -120,9 +120,9 @@ Pure vector search can miss obvious keyword matches. Pure keyword search can mis
 
 Bringer keeps model selection automatic:
 
-- GPU available and plugged in -> `Qwen2.5-7B-Instruct-1M-Q6_K`
+- GPU available and plugged in -> `qwen2.5-7b`
 - GPU available but on battery -> `qwen2.5-3b-instruct`
-- CPU only -> `gemma-4-E2B-it-Q4_K_M`
+- CPU only -> `google/gemma-4-e2b`
 
 That helps it stay usable across different machines without making the user pick a model every time.
 

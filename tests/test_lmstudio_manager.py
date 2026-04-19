@@ -14,7 +14,7 @@ class LMStudioManagerTests(unittest.TestCase):
 
     @patch("src.modules.lmstudio_manager.time.sleep", return_value=None)
     def test_load_model_unloads_existing_models_then_loads_with_preset(self, _sleep):
-        desired_model = "Qwen2.5-7B-Instruct-1M-Q6_K"
+        desired_model = "qwen2.5-7b"
         states = [
             ["deepseek-coder-6.7b-instruct"],
             [desired_model],
@@ -42,16 +42,16 @@ class LMStudioManagerTests(unittest.TestCase):
             command_calls,
             [
                 (["lms", "unload", "--all"], True),
-                (["lms", "load", desired_model, "--preset", "Bringer_RAG"], True),
+                (["lms", "load", desired_model], True),
             ],
         )
 
     @patch("src.modules.lmstudio_manager.time.sleep", return_value=None)
     def test_load_model_uses_selected_model_without_unload_when_nothing_loaded(self, _sleep):
         desired_models = [
-            "Qwen2.5-7B-Instruct-1M-Q6_K",
+            "qwen2.5-7b",
             "qwen2.5-3b-instruct",
-            "gemma-4-E2B-it-Q4_K_M",
+            "google/gemma-4-e2b",
         ]
 
         for desired_model in desired_models:
@@ -87,7 +87,7 @@ class LMStudioManagerTests(unittest.TestCase):
                 self.assertTrue(manager.load_model(desired_model))
                 self.assertEqual(
                     command_calls,
-                    [(["lms", "load", desired_model, "--preset", "Bringer_RAG"], True)],
+                    [(["lms", "load", desired_model], True)],
                 )
 
     def test_ensure_ready_starts_server_when_not_running(self):
@@ -96,16 +96,16 @@ class LMStudioManagerTests(unittest.TestCase):
         manager.start_server = Mock()
         manager.load_model = Mock(return_value=True)
 
-        manager.ensure_ready("Qwen2.5-7B-Instruct-1M-Q6_K")
+        manager.ensure_ready("qwen2.5-7b")
 
         manager.start_server.assert_called_once()
-        manager.load_model.assert_called_once_with("Qwen2.5-7B-Instruct-1M-Q6_K")
+        manager.load_model.assert_called_once_with("qwen2.5-7b")
 
     @patch("src.modules.lmstudio_manager.httpx.Client")
     def test_get_loaded_models_uses_models_endpoint(self, mock_client_class):
         response = Mock()
         response.status_code = 200
-        response.json.return_value = {"data": [{"id": "Qwen2.5-7B-Instruct-1M-Q6_K"}]}
+        response.json.return_value = {"data": [{"id": "qwen2.5-7b"}]}
 
         mock_client = Mock()
         mock_client.get.return_value = response
@@ -113,7 +113,7 @@ class LMStudioManagerTests(unittest.TestCase):
 
         loaded_models = self.manager.get_loaded_models()
 
-        self.assertEqual(loaded_models, ["Qwen2.5-7B-Instruct-1M-Q6_K"])
+        self.assertEqual(loaded_models, ["qwen2.5-7b"])
         mock_client.get.assert_called_once_with(f"{self.manager.api_base}/models")
 
     @patch("src.modules.lmstudio_manager.subprocess.run")

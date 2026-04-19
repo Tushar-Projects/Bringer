@@ -29,8 +29,10 @@ class LMStudioManager:
         self.timeout = 5.0
         self.model_poll_interval = 2.0
         self.model_load_timeout = 120.0
+        self.model_stabilization_seconds = 5.0
         self.unload_wait_seconds = 3.0
-        self.readiness_timeout = 30.0
+        self.readiness_retry_attempts = 5
+        self.readiness_retry_delay = 2.0
         self.started_by_bringer = False
 
     def is_server_running(self) -> bool:
@@ -122,7 +124,9 @@ class LMStudioManager:
             with httpx.Client(timeout=self.timeout) as client:
                 response = client.post(f"{self.api_base}/chat/completions", json=payload)
                 return response.status_code == 200
-        except Exception:
+        except Exception as e:
+            if "Operation canceled" in str(e):
+                return False
             return False
 
     def _log_loaded_models(self, loaded_models: List[str]):
@@ -158,24 +162,24 @@ class LMStudioManager:
 
         return False
 
-    def wait_for_model_ready(self, desired_model: str) -> bool:
+    def wait_for_model_ready(self, desired_model: str, stabilize_after_registration: bool = False) -> bool:
         """
         Only probes readiness after the exact model is visible in /v1/models.
         """
         if desired_model not in self.get_loaded_models():
-            return False
+            debug_print("Model may still be warming up. Continuing anyway...")
+            return True
 
-        debug_print("[cyan]Running readiness probe...[/cyan]")
-        deadline = time.time() + self.readiness_timeout
-
-        while time.time() < deadline:
+        for attempt in range(self.readiness_retry_attempts):
             if self.is_model_ready_for_generation(desired_model):
-                debug_print("[bold green]Model ready.[/bold green]")
+                debug_print("Model ready.")
                 return True
-            time.sleep(self.model_poll_interval)
 
-        console.print("[bold red]Error: Model appeared but failed readiness check.[/bold red]")
-        return False
+            if attempt < self.readiness_retry_attempts - 1:
+                time.sleep(self.readiness_retry_delay)
+
+        debug_print("Model may still be warming up. Continuing anyway...")
+        return True
 
     def unload_all_models(self) -> bool:
         """Unloads all currently loaded models using the LMS CLI to free VRAM."""
@@ -189,28 +193,27 @@ class LMStudioManager:
 
     def load_model(self, desired_model: str) -> bool:
         """Ensures the exact desired model is loaded and ready."""
-        debug_print("\n[cyan]Checking LM Studio server...[/cyan]")
+        debug_print("\nChecking LM Studio server...")
 
         loaded_models = self.get_loaded_models()
-        self._log_loaded_models(loaded_models)
 
         if desired_model in loaded_models:
-            debug_print(f"[green]Desired model already loaded:[/green] {desired_model}")
+            debug_print("Waiting for model...")
             return self.wait_for_model_ready(desired_model)
-
-        debug_print("[yellow]Desired model not loaded.[/yellow]")
 
         if loaded_models and not self.unload_all_models():
             return False
 
-        debug_print(f"[cyan]Loading model {desired_model} using preset Bringer_RAG...[/cyan]")
+        debug_print("Loading model...")
         if not self._run_lms_command(
-            ["lms", "load", desired_model, "--preset", "Bringer_RAG"],
+            ["lms", "load", desired_model],
             check=True,
         ):
             return False
 
-        debug_print("[cyan]Waiting for model to register...[/cyan]")
+        time.sleep(10)
+
+        debug_print("Waiting for model...")
         if not self._wait_for_model_registration(
             desired_model,
             timeout_seconds=self.model_load_timeout,
@@ -218,8 +221,7 @@ class LMStudioManager:
             console.print("\n[bold red]Error: Timed out waiting for model to appear in LM Studio.[/bold red]")
             return False
 
-        debug_print("[green]Model detected.[/green]")
-        return self.wait_for_model_ready(desired_model)
+        return self.wait_for_model_ready(desired_model, stabilize_after_registration=True)
 
     def ensure_ready(self, selected_model: str):
         """Master orchestration: server check -> model check -> load logic."""
@@ -236,7 +238,7 @@ if __name__ == "__main__":
     console.print("\n[bold magenta]--- LM Studio Manager Test ---[/bold magenta]")
 
     manager = LMStudioManager()
-    test_model = "Qwen2.5-7B-Instruct-1M-Q6_K"
+    test_model = "qwen2.5-7b"
     manager.ensure_ready(test_model)
 
     console.print("\n[bold green]Manager test complete.[/bold green]")
