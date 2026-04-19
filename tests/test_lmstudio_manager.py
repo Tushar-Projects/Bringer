@@ -51,7 +51,7 @@ class LMStudioManagerTests(unittest.TestCase):
         desired_models = [
             "qwen2.5-7b",
             "qwen2.5-3b-instruct",
-            "google/gemma-4-e2b",
+            "gemma-4-e2b-it",
         ]
 
         for desired_model in desired_models:
