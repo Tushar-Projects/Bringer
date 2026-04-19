@@ -48,7 +48,7 @@ Bringer currently selects from these locally installed models:
 
 - `qwen2.5-7b`
 - `qwen2.5-3b-instruct`
-- `google/gemma-4-e2b`
+- `gemma-4-e2b-it`
 
 You can confirm what is installed with:
 
@@ -122,7 +122,7 @@ Bringer keeps model selection automatic:
 
 - GPU available and plugged in -> `qwen2.5-7b`
 - GPU available but on battery -> `qwen2.5-3b-instruct`
-- CPU only -> `google/gemma-4-e2b`
+- CPU only -> `gemma-4-e2b-it`
 
 That helps it stay usable across different machines without making the user pick a model every time.
 
