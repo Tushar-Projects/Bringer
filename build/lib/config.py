@@ -79,11 +79,11 @@ LLM_API_BASE = "http://localhost:1234/v1"
 LLM_API_CHAT_ENDPOINT = f"{LLM_API_BASE}/chat/completions"
 
 # Dynamic Model Selection (based on hardware detection)
-LLM_MODEL_LARGE = "qwen2.5-coder-7b-instruct"      # Plugged in + GPU
+LLM_MODEL_LARGE = "Qwen2.5-7B-Instruct-1M-Q6_K"      # Plugged in + GPU
 LLM_MODEL_MEDIUM = "qwen2.5-3b-instruct"     # Battery + GPU
-LLM_MODEL_SMALL = "qwen2.5-coder-1.5b-instruct"    # CPU only
+LLM_MODEL_SMALL = "gemma-4-E2B-it-Q4_K_M"    # CPU only
 # Fallback/Default for legacy references:
-LLM_MODEL_NAME = "qwen2.5-coder-7b-instruct"
+LLM_MODEL_NAME = "Qwen2.5-7B-Instruct-1M-Q6_K"
 LLM_TEMPERATURE = 0.1                    # Low temp for factual RAG answers
 LLM_TOP_P = 0.9                          # Nucleus sampling probability
 LLM_MAX_TOKENS = 1024                    # Max output tokens per response

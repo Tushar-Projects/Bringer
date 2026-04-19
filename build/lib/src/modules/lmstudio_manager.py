@@ -210,7 +210,7 @@ if __name__ == "__main__":
     console.print("\n[bold magenta]--- LM Studio Manager Test ---[/bold magenta]")
 
     manager = LMStudioManager()
-    test_model = "qwen2.5-coder-7b-instruct"
+    test_model = "Qwen2.5-7B-Instruct-1M-Q6_K"
     manager.ensure_ready(test_model)
 
     console.print("\n[bold green]Manager test complete.[/bold green]")
