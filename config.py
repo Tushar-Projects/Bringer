@@ -52,7 +52,7 @@ EMBEDDING_DIMENSIONS = 384          # Output dimensions of the embedding model
 # =============================================================================
 RERANKER_MODEL_NAME = "cross-encoder/ms-marco-MiniLM-L-6-v2"
 RERANKER_TOP_K = 3                  # Number of results after reranking
-RERANK_MIN_SCORE = 0.55             # Default minimum reranker score required to keep a chunk
+RERANK_MIN_SCORE = 0.4            # Default minimum reranker score required to keep a chunk
 STRICT_RERANK_MIN_SCORE = 0.7
 RELAXED_RERANK_MIN_SCORE = 0.4
 
@@ -87,11 +87,11 @@ LLM_API_BASE = "http://localhost:1234/v1"
 LLM_API_CHAT_ENDPOINT = f"{LLM_API_BASE}/chat/completions"
 
 # Dynamic Model Selection (based on hardware detection)
-LLM_MODEL_LARGE = "Qwen2.5-7B-Instruct-1M-Q6_K"      # Plugged in + GPU
+LLM_MODEL_LARGE = "qwen2.5-7b"      # Plugged in + GPU
 LLM_MODEL_MEDIUM = "qwen2.5-3b-instruct"           # Battery + GPU
-LLM_MODEL_SMALL = "gemma-4-E2B-it-Q4_K_M"    # CPU only
+LLM_MODEL_SMALL = "google/gemma-4-e2b"    # CPU only
 # Fallback/Default for legacy references:
-LLM_MODEL_NAME = "Qwen2.5-7B-Instruct-1M-Q6_K"
+LLM_MODEL_NAME = "qwen2.5-7b"
 LLM_TEMPERATURE = 0.1                    # Low temp for factual RAG answers
 LLM_TOP_P = 0.9                          # Nucleus sampling probability
 LLM_MAX_TOKENS = 1024                    # Max output tokens per response

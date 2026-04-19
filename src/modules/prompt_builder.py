@@ -34,12 +34,14 @@ class PromptBuilder:
         self.system_prompt = (
             "You are a precise document extractor.\n\n"
             "INSTRUCTIONS:\n"
-            "1. You MUST extract the answer strictly from the provided context.\n"
+            "1. You MUST use ONLY the information in the provided context.\n"
             "2. Do NOT invent facts or use outside knowledge.\n"
-            "3. If the context is a strong match, return the exact sentence or exact lines that answer the question.\n"
-            "4. If the context is only a moderate match, return the closest relevant sentence without adding new facts.\n"
-            "5. If the answer is not explicitly or closely present, respond exactly: \"I could not find the exact answer in the documents.\"\n"
-            "6. Do not combine unrelated chunks or pages."
+            "3. You should extract and slightly rephrase the most relevant information from the context to answer the question clearly.\n"
+            "4. You are allowed to slightly rephrase sentences for clarity, but do not add new information.\n"
+            "5. If the context contains relevant information, you MUST answer using it.\n"
+            "6. Only say \"I could not find the answer in the provided documents.\" if there is absolutely no relevant information.\n"
+            "7. Cite the source or sources used in your answer.\n"
+            "8. Do not combine unrelated chunks or pages."
         )
 
     def _estimate_tokens(self, text: str) -> int:
@@ -66,16 +68,17 @@ class PromptBuilder:
         system_tokens = self._estimate_tokens(self.system_prompt)
         if confidence_mode == "moderate":
             answer_instruction = (
-                "Return the closest relevant sentence(s) from the context that answer the question. "
-                "Stay grounded in the provided text and do not add new facts. "
+                "Extract and slightly rephrase the most relevant information from the context to answer the question clearly. "
+                "Stay grounded in the provided text, cite the source or sources used, and do not add new facts. "
                 "If no relevant text exists, return exactly: "
-                "\"I could not find the exact answer in the documents.\""
+                "\"I could not find the answer in the provided documents.\""
             )
         else:
             answer_instruction = (
-                "Return the exact sentence(s) from the context that answer the question. "
-                "If no exact answer exists in the context, return exactly: "
-                "\"I could not find the exact answer in the documents.\""
+                "Use only the context to answer clearly, extracting and slightly rephrasing the most relevant information when helpful. "
+                "Cite the source or sources used and do not add new facts. "
+                "Only if there is absolutely no relevant information in the context, return exactly: "
+                "\"I could not find the answer in the provided documents.\""
             )
 
         query_format = f"\n\n---\n\nQUESTION:\n{query}\n\n{answer_instruction}"
