@@ -12,7 +12,7 @@ class BringerCliTests(unittest.TestCase):
             "gpu_name": "NVIDIA RTX 4070 Laptop GPU",
             "plugged_in": True,
         }
-        self.hardware_detector.select_model.return_value = "qwen2.5-coder-7b-instruct"
+        self.hardware_detector.select_model.return_value = "Qwen2.5-7B-Instruct-1M-Q6_K"
 
         self.lm_manager = Mock()
         self.watcher = Mock()
@@ -44,7 +44,7 @@ class BringerCliTests(unittest.TestCase):
 
         text_calls = [args[0] for args, _ in console_print.call_args_list if args]
         self.assertIn("Bringer AI Assistant\n", text_calls)
-        self.assertIn("Model: qwen2.5-coder-7b-instruct (GPU)", text_calls)
+        self.assertIn("Model: Qwen2.5-7B-Instruct-1M-Q6_K (GPU)", text_calls)
         self.assertIn("Ready.", text_calls)
         self.assertIn("Shutting down Bringer...", text_calls)
         self.assertNotIn("Documents indexed: 71\n", text_calls)
@@ -120,7 +120,7 @@ class BringerCliTests(unittest.TestCase):
         with patch("bringer_cli.shutdown_bringer") as shutdown_bringer:
             bringer_cli.launch_bringer([])
 
-        self.lm_manager.ensure_ready.assert_called_once_with("qwen2.5-coder-7b-instruct")
+        self.lm_manager.ensure_ready.assert_called_once_with("Qwen2.5-7B-Instruct-1M-Q6_K")
         self.watcher.start.assert_called_once()
         shutdown_bringer.assert_called_once_with(self.watcher, self.lm_manager)
 
@@ -210,7 +210,7 @@ class BringerCliTests(unittest.TestCase):
         vector_store_cls.return_value = store
 
         lm_manager = Mock()
-        lm_manager.get_loaded_models.return_value = ["qwen2.5-coder-7b-instruct"]
+        lm_manager.get_loaded_models.return_value = ["Qwen2.5-7B-Instruct-1M-Q6_K"]
         lm_manager_cls.return_value = lm_manager
 
         bringer_cli.run_status()
@@ -223,7 +223,7 @@ class BringerCliTests(unittest.TestCase):
         self.assertIn("- a.pdf", text_calls)
         self.assertIn("- b.docx", text_calls)
         self.assertIn("\nActive model:", text_calls)
-        self.assertIn("- qwen2.5-coder-7b-instruct", text_calls)
+        self.assertIn("- Qwen2.5-7B-Instruct-1M-Q6_K", text_calls)
 
     @patch("bringer_cli.run_status")
     def test_status_flag_runs_status_mode_and_exits(self, run_status):
