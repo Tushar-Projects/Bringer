@@ -19,6 +19,8 @@ import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 import config
 from src.modules.logging_utils import debug_print
+from src.modules.config_manager import get_config_manager
+from src.modules.hardware_detector import HardwareDetector
 
 console = Console()
 
@@ -27,16 +29,30 @@ console = Console()
 # Initialize the model once globally to avoid reloading overhead per function call.
 # =============================================================================
 _MODEL = None
+_CURRENT_MODEL_NAME = None
 
 def get_embedding_model() -> SentenceTransformer:
-    """Lazy loader for the embedding model to ensure it is only loaded once."""
-    global _MODEL
-    if _MODEL is None:
-        debug_print(f"[dim]Loading embedding model '{config.EMBEDDING_MODEL_NAME}' onto {config.DEVICE}...[/dim]")
+    """Lazy loader for the embedding model to ensure it is only loaded once per config change."""
+    global _MODEL, _CURRENT_MODEL_NAME
+    
+    config_manager = get_config_manager()
+    active_mode = config_manager.get_active_mode()
+    
+    if active_mode == "auto":
+        profile_name = HardwareDetector().select_profile()
+    else:
+        profile_name = active_mode
+        
+    profile_config = config_manager.get_profile_config(profile_name)
+    model_name = profile_config.get("embedding", {}).get("name", "sentence-transformers/all-MiniLM-L6-v2")
+    
+    if _MODEL is None or _CURRENT_MODEL_NAME != model_name:
+        debug_print(f"[dim]Loading embedding model '{model_name}' onto {config.DEVICE}...[/dim]")
         t0 = time.perf_counter()
         
         # Load the model directly onto the target device (GPU/CPU)
-        _MODEL = SentenceTransformer(config.EMBEDDING_MODEL_NAME, device=config.DEVICE)
+        _MODEL = SentenceTransformer(model_name, device=config.DEVICE)
+        _CURRENT_MODEL_NAME = model_name
         
         load_time = time.perf_counter() - t0
         debug_print(f"[green]Model loaded in {load_time:.2f}s.[/green]")
@@ -46,7 +62,19 @@ class EmbeddingEngine:
     def __init__(self):
         """Initialize the Embedding Engine (loads model implicitly via singleton)."""
         self.model = get_embedding_model()
-        self.batch_size = config.EMBEDDING_BATCH_SIZE
+        
+        config_manager = get_config_manager()
+        active_mode = config_manager.get_active_mode()
+        if active_mode == "auto":
+            profile_name = HardwareDetector().select_profile()
+        else:
+            profile_name = active_mode
+            
+        profile_config = config_manager.get_profile_config(profile_name)
+        emb_config = profile_config.get("embedding", {})
+        
+        self.batch_size = emb_config.get("batch_size", 64)
+        self.expected_dimensions = emb_config.get("dimensions", 384)
 
     @lru_cache(maxsize=128)
     def embed_query(self, query: str) -> List[float]:
@@ -146,10 +174,10 @@ if __name__ == "__main__":
                 console.print(f"Embedding dimension: {embedding_dim}")
                 console.print(f"Device used: {embedder.model.device}")
                 
-                if embedding_dim == config.EMBEDDING_DIMENSIONS:
-                    console.print(f"[green]Dimension matches expected config ({config.EMBEDDING_DIMENSIONS})[/green]")
+                if embedding_dim == embedder.expected_dimensions:
+                    console.print(f"[green]Dimension matches expected config ({embedder.expected_dimensions})[/green]")
                 else:
-                    console.print(f"[red]Warning: Expected {config.EMBEDDING_DIMENSIONS} dimensions, got {embedding_dim}[/red]")
+                    console.print(f"[red]Warning: Expected {embedder.expected_dimensions} dimensions, got {embedding_dim}[/red]")
         else:
             console.print("[red]Failed to load text for testing.[/red]")
     else:
