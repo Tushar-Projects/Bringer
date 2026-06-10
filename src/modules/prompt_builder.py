@@ -18,6 +18,8 @@ import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 import config
 from src.modules.logging_utils import debug_print
+from src.modules.config_manager import get_config_manager
+from src.modules.hardware_detector import HardwareDetector
 
 console = Console()
 
@@ -28,7 +30,15 @@ _TOKENIZER = tiktoken.get_encoding("cl100k_base")
 class PromptBuilder:
     def __init__(self):
         """Initializes the prompt builder with context limits from config."""
-        self.max_context_tokens = config.LLM_MAX_CONTEXT_TOKENS
+        config_manager = get_config_manager()
+        active_mode = config_manager.get_active_mode()
+        if active_mode == "auto":
+            profile_name = HardwareDetector().select_profile()
+        else:
+            profile_name = active_mode
+            
+        profile_config = config_manager.get_profile_config(profile_name)
+        self.max_context_tokens = profile_config.get("llm", {}).get("n_ctx", 8192)
         
         # Base system instruction used for all RAG queries
         self.system_prompt = (
@@ -86,7 +96,7 @@ class PromptBuilder:
         
         # 2. Add chunks until we hit the context safety limit
         # Leave a 500 token safety buffer for system framing and the expected output generation
-        available_budget = self.max_context_tokens - system_tokens - query_tokens - config.LLM_MAX_TOKENS - 500
+        available_budget = self.max_context_tokens - system_tokens - query_tokens - 1024 - 500
         
         context_text = "CONTEXT:\n"
         chunks_used = 0

@@ -18,19 +18,35 @@ import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 import config
 from src.modules.logging_utils import debug_print
+from src.modules.config_manager import get_config_manager
+from src.modules.hardware_detector import HardwareDetector
 
 console = Console()
 
 # Global Singleton to avoid reloading overhead
 _RERANKER_MODEL = None
+_CURRENT_RERANKER_NAME = None
 
 def get_reranker_model() -> CrossEncoder:
     """Lazy loader for the cross-encoder model."""
-    global _RERANKER_MODEL
-    if _RERANKER_MODEL is None:
-        debug_print(f"[dim]Loading reranker model '{config.RERANKER_MODEL_NAME}' onto {config.DEVICE}...[/dim]")
+    global _RERANKER_MODEL, _CURRENT_RERANKER_NAME
+    
+    config_manager = get_config_manager()
+    active_mode = config_manager.get_active_mode()
+    
+    if active_mode == "auto":
+        profile_name = HardwareDetector().select_profile()
+    else:
+        profile_name = active_mode
+        
+    profile_config = config_manager.get_profile_config(profile_name)
+    model_name = profile_config.get("reranker", {}).get("name", "cross-encoder/ms-marco-MiniLM-L-6-v2")
+
+    if _RERANKER_MODEL is None or _CURRENT_RERANKER_NAME != model_name:
+        debug_print(f"[dim]Loading reranker model '{model_name}' onto {config.DEVICE}...[/dim]")
         t0 = time.perf_counter()
-        _RERANKER_MODEL = CrossEncoder(config.RERANKER_MODEL_NAME, device=config.DEVICE)
+        _RERANKER_MODEL = CrossEncoder(model_name, device=config.DEVICE)
+        _CURRENT_RERANKER_NAME = model_name
         load_time = time.perf_counter() - t0
         debug_print(f"[green]Reranker loaded in {load_time:.2f}s.[/green]")
     return _RERANKER_MODEL
@@ -39,7 +55,17 @@ def get_reranker_model() -> CrossEncoder:
 class Reranker:
     def __init__(self):
         self.model = get_reranker_model()
-        self.min_score = config.RERANK_MIN_SCORE
+        
+        config_manager = get_config_manager()
+        active_mode = config_manager.get_active_mode()
+        if active_mode == "auto":
+            profile_name = HardwareDetector().select_profile()
+        else:
+            profile_name = active_mode
+            
+        profile_config = config_manager.get_profile_config(profile_name)
+        rerank_config = profile_config.get("reranker", {})
+        self.min_score = rerank_config.get("min_score", 0.4)
 
     @torch.no_grad()
     def rerank(

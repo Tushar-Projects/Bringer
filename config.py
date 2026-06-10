@@ -41,62 +41,42 @@ DEBUG_MODE = False
 DEVICE = get_device()
 
 # =============================================================================
-# Embedding Model
+# Model configuration is now managed centrally via models.json
+# See src/modules/config_manager.py
 # =============================================================================
-EMBEDDING_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
-EMBEDDING_BATCH_SIZE = 64           # Chunks per batch for embedding generation
-EMBEDDING_DIMENSIONS = 384          # Output dimensions of the embedding model
+LLM_TIMEOUT = 120                        # Seconds before request timeout
 
 # =============================================================================
-# Reranker Model
+# Reranker / Retrieval Thresholds
 # =============================================================================
-RERANKER_MODEL_NAME = "cross-encoder/ms-marco-MiniLM-L-6-v2"
-RERANKER_TOP_K = 3                  # Number of results after reranking
-RERANK_MIN_SCORE = 0.4            # Default minimum reranker score required to keep a chunk
+RERANK_MIN_SCORE = 0.4
 STRICT_RERANK_MIN_SCORE = 0.7
 RELAXED_RERANK_MIN_SCORE = 0.4
+
+SEMANTIC_TOP_K = 3
+MIN_SIMILARITY_SCORE = 0.45
+STRICT_MIN_SIMILARITY_SCORE = 0.6
+RELAXED_MIN_SIMILARITY_SCORE = 0.3
+BM25_TOP_K = 20
+HYBRID_TOP_K = 3
+FINAL_TOP_K = 3
+STRICT_FINAL_TOP_K = 3
+RELAXED_FINAL_TOP_K = 5
+
+SEMANTIC_WEIGHT = 0.7
+KEYWORD_WEIGHT = 0.3
 
 # =============================================================================
 # Chunking
 # =============================================================================
-CHUNK_SIZE_TOKENS = 400             # Target chunk size in tokens
-CHUNK_OVERLAP_TOKENS = 50           # Overlap between consecutive chunks (tokens)
-# Recursive splitting hierarchy (preserves paragraphs and sentences before words)
+CHUNK_SIZE_TOKENS = 400
+CHUNK_OVERLAP_TOKENS = 50
 CHUNK_SEPARATORS = ["\n\n", "\n", ". ", "? ", "! ", " ", ""]
 
 # =============================================================================
-# Retrieval
+# Vector Database
 # =============================================================================
-SEMANTIC_TOP_K = 3                  # Default top-k results from vector search
-MIN_SIMILARITY_SCORE = 0.45         # Default minimum score threshold (0-1) to keep a chunk
-STRICT_MIN_SIMILARITY_SCORE = 0.6
-RELAXED_MIN_SIMILARITY_SCORE = 0.3
-BM25_TOP_K = 20                     # Top-k results from BM25 keyword search
-HYBRID_TOP_K = 3                    # Merged results before reranking
-FINAL_TOP_K = 3                     # Results sent to LLM after reranking
-STRICT_FINAL_TOP_K = 3
-RELAXED_FINAL_TOP_K = 5
-
-SEMANTIC_WEIGHT = 0.7               # Weight given to vector similarity
-KEYWORD_WEIGHT = 0.3                # Weight given to BM25 lexical matches
-
-# =============================================================================
-# LM Studio / LLM
-# =============================================================================
-LLM_API_BASE = "http://localhost:1234/v1"
-LLM_API_CHAT_ENDPOINT = f"{LLM_API_BASE}/chat/completions"
-
-# Dynamic Model Selection (based on hardware detection)
-LLM_MODEL_LARGE = "qwen2.5-7b"      # Plugged in + GPU
-LLM_MODEL_MEDIUM = "qwen2.5-3b-instruct"           # Battery + GPU
-LLM_MODEL_SMALL = "gemma-4-e2b-it"    # CPU only
-# Fallback/Default for legacy references:
-LLM_MODEL_NAME = "qwen2.5-7b"
-LLM_TEMPERATURE = 0.1                    # Low temp for factual RAG answers
-LLM_TOP_P = 0.9                          # Nucleus sampling probability
-LLM_MAX_TOKENS = 1024                    # Max output tokens per response
-LLM_MAX_CONTEXT_TOKENS = 8192            # Max total prompt size context window
-LLM_TIMEOUT = 120                        # Seconds before request timeout
+CHROMA_COLLECTION_NAME = "bringer_documents"
 
 # =============================================================================
 # File Watcher

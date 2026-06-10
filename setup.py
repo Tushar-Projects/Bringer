@@ -19,6 +19,7 @@ setup(
         "chromadb>=0.5.0",
         "httpx>=0.27.0",
         "langchain-text-splitters>=0.2.0",
+        "llama-cpp-python>=0.2.60",
         "markdown>=3.5",
         "psutil>=5.9.0",
         "pypdf>=4.0.0",

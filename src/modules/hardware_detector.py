@@ -89,36 +89,69 @@ class HardwareDetector:
             return True
         return battery.power_plugged
 
+    def is_power_saver_enabled(self) -> bool:
+        """
+        Attempts to detect if OS power saver is enabled.
+        On Windows, we can use ctypes. For other OS, we default to False unless battery < 20%.
+        """
+        import platform
+        if platform.system() == "Windows":
+            try:
+                import ctypes
+                from ctypes import wintypes
+                
+                class SYSTEM_POWER_STATUS(ctypes.Structure):
+                    _fields_ = [
+                        ('ACLineStatus', wintypes.BYTE),
+                        ('BatteryFlag', wintypes.BYTE),
+                        ('BatteryLifePercent', wintypes.BYTE),
+                        ('SystemStatusFlag', wintypes.BYTE),
+                        ('BatteryLifeTime', wintypes.DWORD),
+                        ('BatteryFullLifeTime', wintypes.DWORD),
+                    ]
+                
+                status = SYSTEM_POWER_STATUS()
+                if ctypes.windll.kernel32.GetSystemPowerStatus(ctypes.byref(status)):
+                    # SystemStatusFlag bit 0 indicates Battery Saver is on (value 1)
+                    return status.SystemStatusFlag == 1
+            except Exception:
+                pass
+                
+        # Fallback for non-Windows or if ctypes fails: 
+        # assume power saver if on battery and < 20%
+        battery = psutil.sensors_battery()
+        if battery and not battery.power_plugged and battery.percent < 20:
+            return True
+        return False
+
     def detect_hardware(self) -> Dict[str, Any]:
         """
         Returns a dictionary of hardware states.
         """
         plugged_in = self.is_plugged_in()
+        power_saver = self.is_power_saver_enabled()
         
         status = {
             "gpu_available": self.gpu_available,
             "gpu_name": self.gpu_name if self.gpu_available else "N/A",
-            "plugged_in": plugged_in
+            "plugged_in": plugged_in,
+            "power_saver": power_saver
         }
         return status
 
-    def select_model(self) -> str:
+    def select_profile(self) -> str:
         """
-        Selects the best model based on the current hardware state.
+        Selects the best power profile based on the current hardware state.
+        """
+        plugged_in = self.is_plugged_in()
+        power_saver = self.is_power_saver_enabled()
         
-        Logic:
-        - GPU + AC Power: Large Model
-        - GPU + Battery: Medium Model
-        - CPU only: Small Model
-        """
-        if self.gpu_available:
-            if self.is_plugged_in():
-                return config.LLM_MODEL_LARGE
-            else:
-                return config.LLM_MODEL_MEDIUM
+        if power_saver:
+            return "low_power"
+        elif not plugged_in:
+            return "balanced"
         else:
-            return config.LLM_MODEL_SMALL
-
+            return "high_performance"
 
 # Quick test trigger
 if __name__ == "__main__":
@@ -134,6 +167,7 @@ if __name__ == "__main__":
         console.print()
         
     console.print(f"[cyan]Power state:[/cyan] {'Plugged in' if hw_state['plugged_in'] else 'On battery'}")
+    console.print(f"[cyan]Power Saver:[/cyan] {'Enabled' if hw_state['power_saver'] else 'Disabled'}")
     
-    selected_model = detector.select_model()
-    console.print(f"\n[bold green]Selected Model:[/bold green] {selected_model}")
+    selected_profile = detector.select_profile()
+    console.print(f"\n[bold green]Selected Profile:[/bold green] {selected_profile}")
