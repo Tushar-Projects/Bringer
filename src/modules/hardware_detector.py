@@ -5,18 +5,20 @@ Analyzes system resources (GPU availability, battery power state)
 to dynamically select the most appropriate LLM tier for local inference.
 """
 
-import psutil
 import subprocess
-from typing import Dict, Any, Tuple
+from typing import Any
+
+import psutil
 from rich.console import Console
 
 try:
     import torch
-except Exception:  # pragma: no cover - handled via fallback detection
+except Exception:  # noqa: BLE001
     torch = None
 
-import sys
 import os
+import sys
+
 # Add project root to path so we can import config
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 import config
@@ -32,7 +34,7 @@ class HardwareDetector:
         else:
             self.gpu_available, self.gpu_name = self.detect_gpu()
 
-    def _detect_gpu_via_torch(self) -> Tuple[bool, str]:
+    def _detect_gpu_via_torch(self) -> tuple[bool, str]:
         """Checks whether CUDA is available via PyTorch."""
         if torch is None:
             return False, "N/A"
@@ -40,12 +42,12 @@ class HardwareDetector:
         try:
             if torch.cuda.is_available():
                 return True, torch.cuda.get_device_name(0)
-        except Exception:
+        except Exception:  # noqa: BLE001, S110
             pass
 
         return False, "N/A"
 
-    def _detect_gpu_via_nvidia_smi(self) -> Tuple[bool, str]:
+    def _detect_gpu_via_nvidia_smi(self) -> tuple[bool, str]:
         """Checks whether an NVIDIA GPU is present using nvidia-smi."""
         query_result = subprocess.run(
             ["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"],
@@ -68,7 +70,7 @@ class HardwareDetector:
 
         return False, "N/A"
 
-    def detect_gpu(self) -> Tuple[bool, str]:
+    def detect_gpu(self) -> tuple[bool, str]:
         """
         Detects GPU availability using PyTorch first, then nvidia-smi as a fallback.
         """
@@ -114,17 +116,15 @@ class HardwareDetector:
                 if ctypes.windll.kernel32.GetSystemPowerStatus(ctypes.byref(status)):
                     # SystemStatusFlag bit 0 indicates Battery Saver is on (value 1)
                     return status.SystemStatusFlag == 1
-            except Exception:
+            except Exception:  # noqa: BLE001, S110
                 pass
                 
         # Fallback for non-Windows or if ctypes fails: 
         # assume power saver if on battery and < 20%
         battery = psutil.sensors_battery()
-        if battery and not battery.power_plugged and battery.percent < 20:
-            return True
-        return False
+        return bool(battery and not battery.power_plugged and battery.percent < 20)
 
-    def detect_hardware(self) -> Dict[str, Any]:
+    def detect_hardware(self) -> dict[str, Any]:
         """
         Returns a dictionary of hardware states.
         """

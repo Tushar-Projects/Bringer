@@ -5,16 +5,17 @@ Client for interacting with the LlamaManager.
 Supports generation and streaming of LLM responses based on the active profile.
 """
 
-from typing import List, Dict, Any, Generator, Optional
+import os
+import sys
+from collections.abc import Generator
+
 from rich.console import Console
 
-import sys
-import os
 # Add project root to path so we can import config
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
-from src.modules.llama_manager import get_llama_manager
 from src.modules.config_manager import get_config_manager
 from src.modules.hardware_detector import HardwareDetector
+from src.modules.llama_manager import get_llama_manager
 
 console = Console()
 
@@ -32,14 +33,14 @@ class LLMClient:
             return self.hardware_detector.select_profile()
         return active_mode
 
-    def generate(self, messages: List[Dict[str, str]]) -> Optional[str]:
+    def generate(self, messages: list[dict[str, str]]) -> str | None:
         """
         Generates a complete response string.
         """
         profile_name = self.get_current_profile_name()
         return self.llama_manager.generate(messages, profile_name)
 
-    def stream(self, messages: List[Dict[str, str]]) -> Generator[str, None, None]:
+    def stream(self, messages: list[dict[str, str]]) -> Generator[str, None, None]:
         """
         Streams the response back token by token.
         """
@@ -53,7 +54,7 @@ if __name__ == "__main__":
     else:
         test_prompt = "Explain RAG (Retrieval-Augmented Generation) in exactly two short sentences."
         
-    console.print(f"\n[bold magenta]--- Llama Manager Test ---[/bold magenta]")
+    console.print("\n[bold magenta]--- Llama Manager Test ---[/bold magenta]")
     console.print(f"[cyan]Prompt:[/cyan] {test_prompt}\n")
     
     client = LLMClient()

@@ -5,25 +5,23 @@ Monitors the documents/ directory for changes and automatically
 indexes new or modified files, and removes deleted files from the vector store.
 """
 
+import os
+import sys
 import time
 from pathlib import Path
-from typing import Dict
+
 from rich.console import Console
-
-from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
+from watchdog.observers import Observer
 
-import sys
-import os
 # Add project root to path so we can import config
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 import config
-
-from src.modules.document_loader import DocumentLoader
 from src.modules.chunking_engine import ChunkingEngine
+from src.modules.document_loader import DocumentLoader
 from src.modules.embedding_engine import EmbeddingEngine
-from src.modules.vector_store import VectorStore
 from src.modules.logging_utils import debug_print
+from src.modules.vector_store import VectorStore
 
 console = Console()
 
@@ -36,7 +34,7 @@ class DocumentIndexingHandler(FileSystemEventHandler):
         self.store = VectorStore()
         
         # Debounce dictionary: filepath -> last_processed_time
-        self.last_processed: Dict[str, float] = {}
+        self.last_processed: dict[str, float] = {}
         self.debounce_seconds = 1.0
 
     def _is_valid_file(self, file_path: Path) -> bool:
@@ -46,28 +44,24 @@ class DocumentIndexingHandler(FileSystemEventHandler):
             
         name = file_path.name
         # Ignore temporary files
-        if name.startswith('~$') or name.startswith('.') or name.endswith('.tmp') or name.endswith('.lock'):
+        if name.startswith(('~$', '.')) or name.endswith(('.tmp', '.lock')):
             return False
             
         # Only process supported formats
         ext = file_path.suffix.lower()
-        if ext not in ['.pdf', '.docx', '.pptx', '.txt', '.md']:
-            return False
-            
-        return True
+        return ext in ['.pdf', '.docx', '.pptx', '.txt', '.md']
 
     def _should_debounce(self, file_path_str: str) -> bool:
         """Returns True if the event should be ignored due to debouncing."""
         now = time.time()
-        if file_path_str in self.last_processed:
-            if now - self.last_processed[file_path_str] < self.debounce_seconds:
+        if file_path_str in self.last_processed and now - self.last_processed[file_path_str] < self.debounce_seconds:
                 return True
         self.last_processed[file_path_str] = now
         return False
 
     def _index_document(self, file_path: Path):
         """Runs the full indexing pipeline for a single document."""
-        debug_print(f"\n[bold cyan]Indexing document...[/bold cyan]")
+        debug_print("\n[bold cyan]Indexing document...[/bold cyan]")
         
         t0 = time.perf_counter()
         

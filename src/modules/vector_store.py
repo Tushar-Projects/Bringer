@@ -7,16 +7,16 @@ support for deduplication via file hashing (incremental indexing).
 """
 
 import hashlib
+import os
+import sys
 import time
 from pathlib import Path
-from typing import List, Dict, Any, Optional
-from rich.console import Console
+from typing import Any
 
 import chromadb
 from chromadb.config import Settings
+from rich.console import Console
 
-import sys
-import os
 # Add project root to path so we can import config
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 import config
@@ -110,7 +110,7 @@ class VectorStore:
             
         return count
 
-    def add_chunks(self, chunks: List[Dict[str, Any]], original_file_path: Path | str) -> bool:
+    def add_chunks(self, chunks: list[dict[str, Any]], original_file_path: Path | str) -> bool:
         """
         Stores chunks and their embeddings in ChromaDB.
         Automatically handles hashing for deduplication.
@@ -169,8 +169,8 @@ class VectorStore:
         Runs the full indexing pipeline for a single file and stores its chunks.
         Returns True when indexing succeeds.
         """
-        from src.modules.document_loader import DocumentLoader
         from src.modules.chunking_engine import ChunkingEngine
+        from src.modules.document_loader import DocumentLoader
         from src.modules.embedding_engine import EmbeddingEngine
 
         path = Path(file_path)
@@ -191,7 +191,7 @@ class VectorStore:
         embedded_chunks = embedder.generate_embeddings(chunks)
         return self.add_chunks(embedded_chunks, path)
 
-    def semantic_search(self, query_embedding: List[float], n_results: int = config.SEMANTIC_TOP_K) -> Dict[str, Any]:
+    def semantic_search(self, query_embedding: list[float], n_results: int = config.SEMANTIC_TOP_K) -> dict[str, Any]:
         """
         Performs a pure vector similarity search.
         
@@ -215,7 +215,7 @@ class VectorStore:
         
         return results
         
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Returns statistics about the current vector database."""
         total_chunks = self.collection.count()
         # To get total files, we'd need to fetch all metadata and count unique file_paths.
@@ -233,16 +233,17 @@ class VectorStore:
 
 # Quick test trigger block (only runs if executed directly)
 if __name__ == "__main__":
-    from document_loader import DocumentLoader
-    from chunking_engine import ChunkingEngine
-    from embedding_engine import EmbeddingEngine
     import sys
+
+    from chunking_engine import ChunkingEngine
+    from document_loader import DocumentLoader
+    from embedding_engine import EmbeddingEngine
     
     if len(sys.argv) > 1:
         test_path_str = sys.argv[1]
         test_path = Path(test_path_str)
         
-        console.print(f"\n[bold magenta]--- Vector Store Test ---[/bold magenta]")
+        console.print("\n[bold magenta]--- Vector Store Test ---[/bold magenta]")
         
         # 1. Init store
         store = VectorStore()

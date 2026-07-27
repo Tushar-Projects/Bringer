@@ -6,16 +6,17 @@ Allows the user to continuously ask questions without restarting the script,
 streaming the answers back in real-time.
 """
 
-import sys
 import os
+import sys
 import time
+
 from rich.console import Console
 
 # Ensure our local modules can be found
 sys.path.append(os.path.abspath(os.path.dirname(__file__)))
 
-from src.modules.rag_pipeline import RAGPipeline
 from src.modules.file_watcher import DocumentWatcher
+from src.modules.rag_pipeline import RAGPipeline
 
 console = Console()
 
@@ -65,8 +66,8 @@ def main():
             watcher.stop()
             console.print("[dim]Shutting down Bringer. Goodbye![/dim]\n")
             break
-        except Exception as e:
-            console.print(f"\n[bold red]An unexpected error occurred:[/bold red] {str(e)}\n")
+        except Exception as e:  # noqa: BLE001
+            console.print(f"\n[bold red]An unexpected error occurred:[/bold red] {e!s}\n")
 
 if __name__ == "__main__":
     main()

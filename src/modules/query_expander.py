@@ -6,16 +6,15 @@ Multiple queries increase the probability of matching the vocabulary used
 in the retrieved documents, significantly improving recall.
 """
 
-import time
 import json
-from typing import List
+import os
+import sys
+import time
+
 from rich.console import Console
 
-import sys
-import os
 # Add project root to path so we can import config
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
-import config
 
 from src.modules.llm_client import LLMClient
 from src.modules.logging_utils import debug_print
@@ -35,7 +34,7 @@ class QueryExpander:
             "Example output:\n[\"alternative 1\", \"alternative 2\", \"alternative 3\"]"
         )
 
-    def expand_query(self, query: str) -> List[str]:
+    def expand_query(self, query: str) -> list[str]:
         """
         Generates alternative queries via the LLM API.
         
@@ -64,12 +63,9 @@ class QueryExpander:
         try:
             # Clean up the output in case the LLM ignored rules and wrapped in markdown
             cleaned_text = response_text.strip()
-            if cleaned_text.startswith("```json"):
-                cleaned_text = cleaned_text[7:]
-            if cleaned_text.startswith("```"):
-                cleaned_text = cleaned_text[3:]
-            if cleaned_text.endswith("```"):
-                cleaned_text = cleaned_text[:-3]
+            cleaned_text = cleaned_text.removeprefix("```json")
+            cleaned_text = cleaned_text.removeprefix("```")
+            cleaned_text = cleaned_text.removesuffix("```")
                 
             alternatives = json.loads(cleaned_text.strip())
             

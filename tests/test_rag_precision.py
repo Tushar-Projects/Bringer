@@ -12,9 +12,9 @@ class PromptBuilderTests(unittest.TestCase):
         builder = PromptBuilder()
 
         self.assertIn("You are a precise document extractor.", builder.system_prompt)
-        self.assertIn("exact sentence or exact lines", builder.system_prompt)
-        self.assertIn("closest relevant sentence", builder.system_prompt)
-        self.assertIn("I could not find the exact answer in the documents.", builder.system_prompt)
+        self.assertIn("ONLY the information in the provided context", builder.system_prompt)
+        self.assertIn("extract and slightly rephrase the most relevant information", builder.system_prompt)
+        self.assertIn("I could not find the answer in the provided documents.", builder.system_prompt)
 
     def test_prompt_uses_source_and_page_without_chunk_ids(self):
         builder = PromptBuilder()
@@ -32,7 +32,7 @@ class PromptBuilderTests(unittest.TestCase):
         user_prompt = messages[1]["content"]
         self.assertIn("[Source: Module_2.pdf | page 17]", user_prompt)
         self.assertNotIn("chunk 3", user_prompt)
-        self.assertIn("closest relevant sentence", user_prompt)
+        self.assertIn("A watchdog timer is an electronic", user_prompt)
 
 
 class RerankerTests(unittest.TestCase):
@@ -87,7 +87,7 @@ class RagPipelineTests(unittest.TestCase):
 
         result = list(pipeline.run_rag("query"))
 
-        self.assertEqual(result, ["\nI could not find the exact answer in the documents."])
+        self.assertEqual(result, ["\nI could not find the answer in the provided documents."])
         pipeline.reranker.rerank.assert_not_called()
 
     def test_extract_sources_prefers_page_level_citations(self):

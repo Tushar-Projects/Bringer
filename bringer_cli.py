@@ -6,17 +6,15 @@ server startup, model loading, file watching, and the interactive RAG pipeline.
 """
 
 import argparse
-import sys
 import os
-import shutil
 import time
 from pathlib import Path
 
 from rich.console import Console
 
 import config
-from src.modules.logging_utils import configure_runtime_logging, debug_print
 from src.modules.config_manager import get_config_manager
+from src.modules.logging_utils import configure_runtime_logging, debug_print
 
 console = Console()
 
@@ -29,7 +27,7 @@ def shutdown_bringer(watcher):
     try:
         from src.modules.llama_manager import get_llama_manager
         get_llama_manager().shutdown()
-    except Exception:
+    except Exception:  # noqa: BLE001, S110
         pass
 
 
@@ -87,8 +85,8 @@ def _load_runtime_modules():
     try:
         from src.modules.file_watcher import DocumentWatcher
         from src.modules.hardware_detector import HardwareDetector
-        from src.modules.rag_pipeline import RAGPipeline
         from src.modules.llama_manager import get_llama_manager
+        from src.modules.rag_pipeline import RAGPipeline
         return DocumentWatcher, HardwareDetector, RAGPipeline, get_llama_manager
     except ImportError as e:
         console.print("[bold red]Bringer is missing required Python dependencies.[/bold red]")
@@ -161,7 +159,7 @@ def run_status():
             console.print(f"\nActive model: {mgr.current_model_path}")
         else:
             console.print("\nNo LLM currently loaded in memory.")
-    except Exception:
+    except Exception:  # noqa: BLE001
         console.print("\nLLM Manager not available.")
 
 
@@ -196,8 +194,8 @@ def cmd_models(args):
             
     elif args.models_command == "reload":
         try:
-            from src.modules.llama_manager import get_llama_manager
             from src.modules.hardware_detector import HardwareDetector
+            from src.modules.llama_manager import get_llama_manager
             mgr = get_llama_manager()
             mgr._unload_model()
             active_mode = config_manager.get_active_mode()
@@ -260,7 +258,7 @@ def cmd_lifecycle(command):
         
         # Check llama-cpp
         try:
-            import llama_cpp
+            import llama_cpp  # noqa: F401
             console.print("[green]✓ llama-cpp installed[/green]")
         except ImportError:
             console.print("[yellow]⚠ llama-cpp not installed[/yellow]")
@@ -410,8 +408,8 @@ def launch_bringer(argv=None):
 
     except KeyboardInterrupt:
         pass
-    except Exception as e:
-        console.print(f"\n[bold red]Fatal System Error:[/bold red] {str(e)}\n")
+    except Exception as e:  # noqa: BLE001
+        console.print(f"\n[bold red]Fatal System Error:[/bold red] {e!s}\n")
     finally:
         shutdown_bringer(watcher)
 

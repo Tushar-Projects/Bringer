@@ -7,11 +7,11 @@ always returned even if the user's config is broken or missing.
 """
 
 import json
-from pathlib import Path
-from typing import Dict, Any, Optional
-
-import sys
 import os
+import sys
+from pathlib import Path
+from typing import Any
+
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 import config
 from src.modules.logging_utils import debug_print
@@ -47,11 +47,11 @@ BUILT_IN_DEFAULTS = {
 }
 
 class ConfigManager:
-    def __init__(self, config_path: Optional[Path] = None):
+    def __init__(self, config_path: Path | None = None):
         self.config_path = config_path or CONFIG_FILE_PATH
         self.raw_config = self._load_config()
 
-    def _load_config(self) -> Dict[str, Any]:
+    def _load_config(self) -> dict[str, Any]:
         """Loads models.json gracefully. Returns built-ins if missing/broken."""
         if not self.config_path.exists():
             debug_print("[yellow]models.json not found. Using built-in defaults.[/yellow]")
@@ -65,17 +65,17 @@ class ConfigManager:
             debug_print(f"[bold red]Failed to parse models.json:[/bold red] {e}")
             debug_print("[yellow]Falling back to built-in defaults.[/yellow]")
             return BUILT_IN_DEFAULTS.copy()
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             debug_print(f"[bold red]Unexpected error reading models.json:[/bold red] {e}")
             return BUILT_IN_DEFAULTS.copy()
 
-    def save_config(self, config_dict: Dict[str, Any]):
+    def save_config(self, config_dict: dict[str, Any]):
         """Saves the given dictionary to models.json."""
         try:
             with open(self.config_path, "w", encoding="utf-8") as f:
                 json.dump(config_dict, f, indent=2)
             self.raw_config = config_dict
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             debug_print(f"[bold red]Failed to save models.json:[/bold red] {e}")
 
     def get_active_mode(self) -> str:
@@ -89,7 +89,7 @@ class ConfigManager:
             self.raw_config["active_mode"] = mode
             self.save_config(self.raw_config)
 
-    def _deep_merge(self, base: Dict[str, Any], update: Dict[str, Any]) -> Dict[str, Any]:
+    def _deep_merge(self, base: dict[str, Any], update: dict[str, Any]) -> dict[str, Any]:
         """Recursively merges `update` into `base`."""
         merged = base.copy()
         for k, v in update.items():
@@ -99,7 +99,7 @@ class ConfigManager:
                 merged[k] = v
         return merged
 
-    def _resolve_profile(self, profile_name: str, visited: set = None) -> Dict[str, Any]:
+    def _resolve_profile(self, profile_name: str, visited: set | None = None) -> dict[str, Any]:
         """Resolves a profile, applying inheritance from parent -> defaults -> built-ins."""
         if visited is None:
             visited = set()
@@ -136,7 +136,7 @@ class ConfigManager:
 
         return resolved
 
-    def get_profile_config(self, profile_name: str) -> Dict[str, Any]:
+    def get_profile_config(self, profile_name: str) -> dict[str, Any]:
         """Gets fully resolved configuration for a profile."""
         profiles = self.raw_config.get("profiles", {})
         # If the requested profile strictly doesn't exist, we try falling back to balanced

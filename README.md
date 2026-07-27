@@ -1,166 +1,242 @@
-# 🛡️ Bringer: Your Local AI Document Assistant
+# Bringer
 
-Bringer is a lightweight, fully local AI assistant that lives on your computer. It reads your private documents (`.pdf`, `.docx`, `.txt`, `.md`) and answers your questions using local Large Language Models (LLMs). 
+## Project Overview
 
-Unlike other AI tools, **nothing ever leaves your machine**, and Bringer is smart enough to automatically adjust its performance based on your hardware—running faster when plugged into power and saving energy when you're on battery.
+**What Bringer is:**
+Bringer is a lightweight, fully local Artificial Intelligence (AI) document assistant designed to execute directly on your desktop. It provides a conversational interface to query your private documents (`.pdf`, `.docx`, `.txt`, `.md`) using locally hosted Large Language Models (LLMs).
 
----
+**Why it exists:**
+Navigating complex local ML setups and hardware constraints can be difficult for standard document retrieval. Bringer bridges the gap by offering an intelligent, hardware-aware Retrieval-Augmented Generation (RAG) system that automatically scales its resource usage based on your machine's current power state, ensuring responsive AI without draining battery life.
 
-## 🚀 1. Requirements (The Basics)
-
-Before you begin, make sure your computer has the following:
-
-1.  **Python 3.10 or higher**: [Download here](https://www.python.org/downloads/).
-2.  **C++ Build Tools**: Required to run the AI engine on your specific hardware.
-    *   **Windows**: Install [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) and select the **"Desktop development with C++"** workload.
-3.  **An NVIDIA GPU (Optional but Recommended)**: If you have an NVIDIA graphics card, Bringer will use it to generate answers much faster.
+**The problems it solves:**
+- **Hardware-Aware Execution:** Automatically detects available GPUs and current power states (AC vs. Battery Saver) to seamlessly transition between high-performance and low-power LLM profiles.
+- **Privacy First:** Eliminates cloud dependencies. Documents are embedded, indexed, and queried entirely offline.
+- **Unified RAG Pipeline:** Abstracts the complexity of document chunking, hybrid retrieval, and cross-encoder reranking into a simple CLI experience.
 
 ---
 
-## 📥 2. Getting Started
+## Key Features
 
-### Step 1: Install Bringer
-Open your terminal (search for "PowerShell" on Windows) and run these commands one by one:
+- **Local Execution:** 100% offline operation ensures your sensitive documents never leave your machine.
+- **GGUF Model Support:** Native compatibility with quantized `.gguf` models, allowing powerful LLMs to run efficiently on consumer hardware.
+- **Hardware-Aware Profile Switching:** Dynamically adjusts the active LLM based on power availability and GPU presence.
+- **Hybrid Search:** Combines dense vector search (embeddings) with sparse keyword search (BM25) for highly accurate retrieval.
+- **Cross-Encoder Reranking:** Re-evaluates initial search results to ensure only the most contextually relevant chunks are passed to the LLM.
+- **Private Document Retrieval:** Built-in parsers for common formats natively indexed into a local vector database.
+- **CUDA Acceleration:** Automatic utilization of NVIDIA GPUs when available for drastically improved inference speeds.
 
-```bash
-# 1. Download the project (if using git)
-git clone <your-repository-url>
-cd Bringer
+---
 
-# 2. Create a "virtual environment" (a private space for Bringer's files)
-python -m venv .venv
+## Architecture
 
-# 3. Activate the environment
-# On Windows:
-.venv\Scripts\activate
-# On Mac/Linux:
-source .venv/bin/activate
+Bringer utilizes a streamlined Retrieval-Augmented Generation (RAG) pipeline to ensure high precision and contextual accuracy.
 
-# 4. Install the application
-pip install -e .
+### Pipeline Flow
+
+```mermaid
+graph TD
+    DOCS["Documents (.pdf, .txt, etc.)"] --> IDX["Indexer & Chunker"]
+    IDX --> HYBRID["Hybrid Retrieval (Vector + BM25)"]
+    HYBRID --> RERANK["Cross-Encoder Reranker"]
+    RERANK --> PROMPT["Prompt Builder"]
+    PROMPT --> LLM["llama.cpp Engine"]
+    LLM --> OUT["Final Response"]
+    
+    classDef comp fill:#e1f5fe,stroke:#01579b,stroke-width:2px;
+    class DOCS,IDX,HYBRID,RERANK,PROMPT,LLM,OUT comp;
 ```
 
-### Step 2: Initialize Configuration
-Bringer needs a configuration file to know which models to use. Create it by running:
-```bash
-bringer init-config
+---
+
+## Project Structure
+
+```text
+Bringer/
+├── bringer_cli.py          # Command-line interface entry point
+├── config.py               # Global application constants and settings
+├── main.py                 # Core application launch logic
+├── models.json             # User-defined hardware profiles and model paths
+├── src/modules/
+│   ├── config_manager.py   # State management for models and active profiles
+│   ├── document_loader.py  # Parsers for PDF, DOCX, TXT, and Markdown files
+│   ├── hardware_detector.py# OS-level diagnostics for GPU and power states
+│   ├── hybrid_retriever.py # BM25 sparse retrieval engine
+│   ├── llama_manager.py    # Wrapper and lifecycle manager for llama-cpp-python
+│   ├── prompt_builder.py   # System instruction templates and context injection
+│   ├── rag_pipeline.py     # Central orchestrator connecting retrieval and LLM
+│   ├── reranker.py         # Cross-encoder filtering logic
+│   └── vector_store.py     # ChromaDB dense embedding repository
+└── tests/                  # Unit and integration test suite
 ```
 
 ---
 
-## 🧠 3. Setting Up Your AI Models
+## Technology Stack
 
-Bringer uses **GGUF models**. These are single files that contain the "brain" of the AI. You can find many of these on [HuggingFace](https://huggingface.co/models?library=gguf).
+- **Python 3.10+:** Core runtime environment.
+- **llama-cpp-python:** Python bindings for `llama.cpp`, driving the core GGUF inference engine.
+- **ChromaDB:** Lightweight, local vector database for document embeddings.
+- **Rich:** Terminal formatting and real-time streaming UI.
+- **Sentence-Transformers:** Powers both the dense embedding models and the cross-encoder reranking.
 
-### The Three-Profile System
-Bringer changes its "brain" based on your power state:
-*   **High Performance**: Used when your laptop is plugged in.
-*   **Balanced**: Used when you are on battery.
-*   **Low Power**: Used when your laptop's "Power Saver" mode is on.
+---
+
+## Installation
+
+### Prerequisites
+- Python 3.10 or higher.
+- Git.
+- C++ Build Tools (Required for compiling local ML dependencies):
+  - **Windows**: Install Visual Studio Build Tools and select the "Desktop development with C++" workload.
+  - **Linux/Mac**: Standard `gcc`/`clang` toolchains.
+
+### Setup
+1. Clone the repository:
+   ```bash
+   git clone <your-repository-url>
+   cd Bringer
+   ```
+2. Create and activate a virtual environment:
+   ```bash
+   python -m venv .venv
+   
+   # Windows
+   .venv\Scripts\activate
+   
+   # Linux/Mac
+   source .venv/bin/activate
+   ```
+3. Install the application:
+   ```bash
+   pip install -e .
+   ```
+4. Initialize your local configuration:
+   ```bash
+   bringer init-config
+   ```
+
+---
+
+## Configuration
+
+Bringer relies on a `models.json` configuration file to determine which GGUF models to load under different hardware conditions.
+
+### GGUF Models
+Bringer requires quantized models in the `.gguf` format. You must download these separately (e.g., from HuggingFace) and configure Bringer to point to their absolute file paths.
+
+### Power Profile System
+The system maintains three distinct hardware profiles:
+- **High Performance:** Automatically activated when the machine is plugged into AC power. Ideal for larger, more capable models.
+- **Balanced:** Activated when running on battery. Suited for mid-sized models to balance speed and power consumption.
+- **Low Power:** Activated when the OS "Power Saver" mode is detected. Best for small, fast models to conserve battery life.
 
 ### Assigning Models
-Once you have downloaded some `.gguf` files, tell Bringer where they are. Here are the commands for each profile:
-
+You must map your downloaded GGUF files to the respective profiles using the CLI:
 ```bash
-# 1. High Performance (Typically used when your laptop is plugged in)
-bringer models set high_performance llm "C:/path/to/your/large-model.gguf"
+# Set High Performance model
+bringer models set high_performance llm "C:/models/large-model.gguf"
 
-# 2. Balanced (Typically used when you are running on battery)
-bringer models set balanced llm "C:/path/to/your/medium-model.gguf"
+# Set Balanced model
+bringer models set balanced llm "C:/models/medium-model.gguf"
 
-# 3. Low Power (Typically used when Power Saver mode is active)
-bringer models set low_power llm "C:/path/to/your/small-model.gguf"
+# Set Low Power model
+bringer models set low_power llm "C:/models/small-model.gguf"
 ```
 
-### Manually Switching Profiles
-If you want to manually force Bringer to use a specific profile regardless of your battery state:
-
+### Manual Profile Switching
+While Bringer defaults to automatic hardware detection, you can manually override the active profile:
 ```bash
-# Force High Performance
 bringer models profile high_performance
-
-# Force Balanced
-bringer models profile balanced
-
-# Force Low Power
-bringer models profile low_power
-
-# Return to Automatic Detection (Recommended)
+```
+To return to dynamic, hardware-aware switching:
+```bash
 bringer power auto
 ```
 
 ---
 
-## 📂 4. Using Bringer
+## Usage
 
-### Step 1: Add Your Documents
-Copy your PDFs, Word docs, or text files into the `documents` folder inside the Bringer project directory.
+### Workflow
 
-### Step 2: Index Your Files
-Bringer needs to "read" and index your files so it can search them later. Run this whenever you add new files:
+**1. Add Documents**
+Place your private documents (`.pdf`, `.docx`, `.txt`, `.md`) directly into the `documents/` folder located in the root of the Bringer project directory.
+
+**2. Build Index**
+Instruct Bringer to parse, chunk, and embed the documents into the local vector database:
 ```bash
 bringer --reindex
 ```
 
-### Step 3: Start Chatting!
-Now you can start the assistant:
+**3. Launch Bringer**
+Start the interactive terminal assistant:
 ```bash
 bringer
 ```
-**Just type your question and press Enter.** Bringer will search your documents, find the relevant sections, and write an answer for you.
+
+**4. Ask Questions**
+Type your query and press Enter. Bringer will retrieve the most relevant document chunks and stream a context-aware response directly to your terminal.
 
 ---
 
-## 🛠️ 5. Command Reference
-
-Here is a list of everything you can do with the `bringer` command, along with examples:
+## Command Reference
 
 ### Core Commands
-| Command | Purpose | Example Usage |
-| :--- | :--- | :--- |
-| `bringer` | Start the interactive assistant. | `bringer` |
-| `bringer --reindex` | Rebuild the search index from your `documents` folder. | `bringer --reindex` |
-| `bringer doctor` | Checks if everything is installed and configured correctly. | `bringer doctor` |
-| `bringer --status` | Shows how many documents you have indexed. | `bringer --status` |
-| `bringer --debug` | Start with detailed logs (useful for troubleshooting). | `bringer --debug` |
+| Command | Description |
+| :--- | :--- |
+| `bringer` | Start the interactive assistant. |
+| `bringer --reindex` | Rebuild the search index from your `documents` folder. |
+| `bringer doctor` | Checks if everything is installed and configured correctly. |
+| `bringer --status` | Shows how many documents you have indexed. |
+| `bringer --debug` | Start with detailed logs (useful for troubleshooting). |
 
-### Model Management (`bringer models ...`)
-| Command | Purpose | Example Usage |
-| :--- | :--- | :--- |
-| `bringer models show` | See current model-to-profile mappings. | `bringer models show` |
-| `bringer models set <profile> llm <path>` | Assign a model file to a profile. | `bringer models set balanced llm "C:/models/qwen.gguf"` |
-| `bringer models reload` | Switch to a new model without restarting. | `bringer models reload` |
-| `bringer models scan` | Scans project for `.gguf` files. | `bringer models scan` |
-| `bringer models profile <name>` | Manually switch to a specific profile. | `bringer models profile low_power` |
+### Model Commands
+| Command | Description |
+| :--- | :--- |
+| `bringer models show` | See current model-to-profile mappings. |
+| `bringer models set <profile> llm <path>` | Assign a model file to a profile. |
+| `bringer models reload` | Switch to a new model without restarting. |
+| `bringer models scan` | Scans the project directory for `.gguf` files. |
+| `bringer models profile <name>` | Manually switch to a specific profile (e.g., `low_power`). |
 
-### Power Management (`bringer power ...`)
-| Command | Purpose | Example Usage |
-| :--- | :--- | :--- |
-| `bringer power status` | See battery/GPU state and active profile. | `bringer power status` |
-| `bringer power auto` | Enable automatic profile switching. | `bringer power auto` |
-| `bringer power low` | Force Bringer into Low Power mode. | `bringer power low` |
-| `bringer power balanced` | Force Bringer into Balanced mode. | `bringer power balanced` |
-| `bringer power high` | Force Bringer into High Performance mode. | `bringer power high` |
+### Power Commands
+| Command | Description |
+| :--- | :--- |
+| `bringer power status` | See battery/GPU state and active profile. |
+| `bringer power auto` | Enable automatic hardware-based profile switching. |
+| `bringer power low` | Force Bringer into Low Power mode. |
+| `bringer power balanced` | Force Bringer into Balanced mode. |
+| `bringer power high` | Force Bringer into High Performance mode. |
 
 ### System Commands
-| Command | Purpose | Example Usage |
-| :--- | :--- | :--- |
-| `bringer install` | Pure validation check of your installation. | `bringer install` |
-| `bringer update` | Safely checks for updates while preserving config. | `bringer update` |
-| `bringer uninstall` | Removes application but keeps models/config. | `bringer uninstall` |
-| `bringer uninstall --purge` | Deletes everything including models and DB. | `bringer uninstall --purge` |
-| `bringer init-config` | Creates the initial `models.json` file. | `bringer init-config` |
+| Command | Description |
+| :--- | :--- |
+| `bringer install` | Pure validation check of your installation. |
+| `bringer update` | Safely checks for updates while preserving config. |
+| `bringer uninstall` | Removes application but keeps models/config. |
+| `bringer uninstall --purge` | Deletes everything including models and DB. |
+| `bringer init-config` | Creates the initial `models.json` file. |
 
 ---
 
-## ❓ 6. Troubleshooting
+## Troubleshooting
 
-*   **"llama-cpp not installed"**: Make sure you installed the C++ Build Tools mentioned in Section 1, then run `pip install llama-cpp-python`.
-*   **"No valid LLM is loaded"**: You haven't told Bringer where your model files are. Use the `bringer models set` command from Section 3.
-*   **Slow Answers**: If you have an NVIDIA GPU, make sure you installed the GPU version of the AI engine. Run:
-    `$env:CMAKE_ARGS="-DGGML_CUDA=on"; pip install --upgrade --force-reinstall llama-cpp-python --no-cache-dir`
+- **"llama-cpp not installed":** Ensure you have installed the required C++ Build Tools for your OS prior to running `pip install llama-cpp-python`.
+- **"No valid LLM is loaded":** Bringer cannot locate your model. Ensure you have downloaded a `.gguf` file and correctly assigned its absolute path using `bringer models set`.
+- **CUDA Acceleration (Slow Startup / Inference):** If you have an NVIDIA GPU but inference is slow, you likely installed the CPU-only version of `llama-cpp-python`. Reinstall with CUDA bindings enabled:
+  ```bash
+  $env:CMAKE_ARGS="-DGGML_CUDA=on"; pip install --upgrade --force-reinstall llama-cpp-python --no-cache-dir
+  ```
+- **Missing Embeddings or Stale Answers:** If Bringer isn't returning information from recently added files, your vector database is out of sync. Rerun `bringer --reindex` to rebuild the index.
 
 ---
 
-## 🔒 Privacy Notice
-Bringer is **100% private**. It does not have an "upload" button because your data never leaves your hard drive. All AI math is done by your computer's own processor.
+## Privacy
+
+Bringer operates with a strict, 100% local privacy guarantee. It requires no internet connection for inference or retrieval. Your documents are embedded and stored in a local ChromaDB instance, and all mathematical operations for text generation are executed directly on your host machine's CPU or GPU. Absolutely zero telemetry, document data, or query history is transmitted externally.
+
+---
+
+## License
+
+*(Placeholder)* License to be determined.

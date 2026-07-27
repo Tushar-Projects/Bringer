@@ -6,20 +6,21 @@ actual relevance to the user's query, improving precision over standard
 cosine similarity limits.
 """
 
+import os
+import sys
 import time
+from typing import Any
+
 import torch
-from typing import List, Dict, Any
 from rich.console import Console
 from sentence_transformers import CrossEncoder
 
-import sys
-import os
 # Add project root to path so we can import config
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 import config
-from src.modules.logging_utils import debug_print
 from src.modules.config_manager import get_config_manager
 from src.modules.hardware_detector import HardwareDetector
+from src.modules.logging_utils import debug_print
 
 console = Console()
 
@@ -71,10 +72,10 @@ class Reranker:
     def rerank(
         self,
         query: str,
-        chunks: List[Dict[str, Any]],
+        chunks: list[dict[str, Any]],
         top_k: int = config.FINAL_TOP_K,
         min_score: float | None = None,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         Takes a list of candidate chunks and scores them against the query.
         
@@ -108,9 +109,12 @@ class Reranker:
             chunk["rerank_score"] = float(score)
             
         chunks.sort(key=lambda x: x["rerank_score"], reverse=True)
+        
+        # Apply min_score threshold
+        threshold = min_score if min_score is not None else getattr(self, "min_score", 0.0)
+        chunks = [c for c in chunks if c["rerank_score"] >= threshold]
+        
         top_chunks = chunks[:top_k]
-        if len(top_chunks) == 0:
-            top_chunks = chunks[:top_k]
         
         t_rank = time.perf_counter() - t0
         debug_print(f"[dim]Reranker reduced {len(chunks)} down to Top {len(top_chunks)} ({t_rank*1000:.1f}ms).[/dim]")
@@ -125,7 +129,7 @@ if __name__ == "__main__":
     else:
         test_query = "What is a wired LAN?"
         
-    console.print(f"\n[bold magenta]--- Reranker Test ---[/bold magenta]")
+    console.print("\n[bold magenta]--- Reranker Test ---[/bold magenta]")
     
     mock_chunks = [
         {"content": "Wi-Fi is a popular wireless networking technology that uses radio waves.", "metadata": {}},

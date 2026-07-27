@@ -7,17 +7,17 @@ and converting them into clean, raw text.
 Supported formats: PDF, DOCX, PPTX, TXT, MD.
 """
 
-import os
 from pathlib import Path
-from typing import Optional, Dict, Any, List
-from rich.console import Console
+from typing import Any
+
+import docx
+import markdown
+import pptx
 
 # Import parsers
 import pypdf
-import docx
-import pptx
-import markdown
 from bs4 import BeautifulSoup
+from rich.console import Console
 
 console = Console()
 
@@ -33,7 +33,7 @@ class DocumentLoader:
             ".md": self._parse_md
         }
 
-    def load_document(self, file_path: Path | str) -> Optional[List[Dict[str, Any]]]:
+    def load_document(self, file_path: Path | str) -> list[dict[str, Any]] | None:
         """
         Loads a document and extracts its text along with system metadata (optionally per page).
         
@@ -62,11 +62,11 @@ class DocumentLoader:
                 
             return pages
             
-        except Exception as e:
-            console.print(f"[red]Error parsing {path.name}: {str(e)}[/red]")
+        except Exception as e:  # noqa: BLE001
+            console.print(f"[red]Error parsing {path.name}: {e!s}[/red]")
             return None
 
-    def _get_base_metadata(self, path: Path) -> Dict[str, Any]:
+    def _get_base_metadata(self, path: Path) -> dict[str, Any]:
         """Helper to compute baseline metadata for a file."""
         return {
             "source_file": path.name,
@@ -74,7 +74,7 @@ class DocumentLoader:
             "file_type": path.suffix.lower().lstrip('.')
         }
 
-    def _parse_pdf(self, path: Path) -> List[Dict[str, Any]]:
+    def _parse_pdf(self, path: Path) -> list[dict[str, Any]]:
         """Extract text from PDF files using pypdf, appending page numbers."""
         docs = []
         base_meta = self._get_base_metadata(path)
@@ -92,7 +92,7 @@ class DocumentLoader:
                     })
         return docs
 
-    def _parse_docx(self, path: Path) -> List[Dict[str, Any]]:
+    def _parse_docx(self, path: Path) -> list[dict[str, Any]]:
         """Extract text from Word documents using python-docx."""
         doc = docx.Document(path)
         text = [paragraph.text for paragraph in doc.paragraphs if paragraph.text.strip()]
@@ -100,7 +100,7 @@ class DocumentLoader:
             return [{"content": "\n\n".join(text), "metadata": self._get_base_metadata(path)}]
         return []
 
-    def _parse_pptx(self, path: Path) -> List[Dict[str, Any]]:
+    def _parse_pptx(self, path: Path) -> list[dict[str, Any]]:
         """Extract text from PowerPoint presentations using python-pptx (tracks slides as pages)."""
         prs = pptx.Presentation(path)
         docs = []
@@ -120,7 +120,7 @@ class DocumentLoader:
                 })
         return docs
 
-    def _parse_txt(self, path: Path) -> List[Dict[str, Any]]:
+    def _parse_txt(self, path: Path) -> list[dict[str, Any]]:
         """Extract text from plain text files."""
         content = ""
         try:
@@ -134,7 +134,7 @@ class DocumentLoader:
             return [{"content": content.strip(), "metadata": self._get_base_metadata(path)}]
         return []
 
-    def _parse_md(self, path: Path) -> List[Dict[str, Any]]:
+    def _parse_md(self, path: Path) -> list[dict[str, Any]]:
         """Extract text from Markdown files, stripping HTML tags."""
         base = self._parse_txt(path)
         if not base:
@@ -160,7 +160,7 @@ if __name__ == "__main__":
         print(f"Testing loader on: {test_path}")
         pages = loader.load_document(test_path)
         if pages:
-            print(f"\n--- Extracted Text Preview (First 500 chars of page 1) ---")
+            print("\n--- Extracted Text Preview (First 500 chars of page 1) ---")
             print(pages[0]["content"][:500])
             print(f"\nTotal pages/sections extracted: {len(pages)}")
             print(f"Metadata of page 1: {pages[0]['metadata']}")

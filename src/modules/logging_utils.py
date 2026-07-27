@@ -4,11 +4,10 @@ Runtime logging helpers for clean CLI output and optional debug verbosity.
 
 import logging
 import os
+import sys
 import warnings
 
 from rich.console import Console
-
-import sys
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 import config

@@ -6,17 +6,18 @@ hybrid retrieval engine, formats the resulting contexts into a strict prompt,
 sends it to the LM Studio LLM client, and handles the token streaming and source citations.
 """
 
-import time
-from typing import Any, Dict, Generator, List
-
-from rich.console import Console
-
-import sys
 import os
+import re
+import sys
+import time
+from collections.abc import Generator
+from typing import Any
+
+# pyrefly: ignore [missing-import]
+from rich.console import Console
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 import config
-
 from src.modules.hybrid_retriever import HybridRetriever
 from src.modules.llm_client import LLMClient
 from src.modules.logging_utils import debug_print
@@ -38,10 +39,10 @@ class RAGPipeline:
 
     def _retrieve_candidates(
         self,
-        expanded_queries: List[str],
+        expanded_queries: list[str],
         similarity_threshold: float,
         top_k: int,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         raw_chunks = {}
         for q in expanded_queries:
             chunks = self.retriever.retrieve(
@@ -56,7 +57,7 @@ class RAGPipeline:
                     raw_chunks[chunk_id] = chunk
         return list(raw_chunks.values())
 
-    def _filter_context_chunks(self, chunks: List[Dict[str, Any]], min_similarity: float) -> List[Dict[str, Any]]:
+    def _filter_context_chunks(self, chunks: list[dict[str, Any]], min_similarity: float) -> list[dict[str, Any]]:
         """Keeps only strongly related chunks before prompt construction."""
         filtered = []
         for chunk in chunks:
@@ -65,7 +66,7 @@ class RAGPipeline:
                 filtered.append(chunk)
         return filtered
 
-    def _extract_sources(self, chunks: List[Dict[str, Any]]) -> List[str]:
+    def _extract_sources(self, chunks: list[dict[str, Any]]) -> list[str]:
         """Deduplicates and formats source metadata into clean citation strings."""
         sources = set()
         for chunk in chunks:
@@ -77,7 +78,32 @@ class RAGPipeline:
             else:
                 sources.add(source_file)
 
-        return sorted(list(sources))
+        return sorted(sources)
+
+    def _filter_reasoning_stream(self, token_stream: Generator[str, None, None]) -> Generator[str, None, None]:
+        buffer = ""
+        found_answer = False
+        
+        for token in token_stream:
+            if found_answer:
+                yield token
+                continue
+                
+            buffer += token
+            
+            # The model is instructed to always output "Answer:" before its final answer.
+            # We suppress everything before that marker, which naturally hides all 
+            # innate reasoning steps like "Draft:", "<think>", etc.
+            match = re.search(r"(?i)(?:final )?answer:\s*(?:\*\*)?", buffer)
+            if match:
+                found_answer = True
+                yield buffer[match.end():]
+                buffer = ""
+                
+        # Fallback: if the model completely ignored the instruction and never output "Answer:",
+        # we yield whatever was buffered so the user doesn't get a blank response.
+        if not found_answer and buffer:
+            yield buffer
 
     def run_rag(self, query: str) -> Generator[str, None, None]:
         """Orchestrates the entire RAG flow: retrieve -> prompt -> stream LLM."""
@@ -85,7 +111,7 @@ class RAGPipeline:
 
         t0 = time.perf_counter()
         expanded_queries = self.expander.expand_query(query)
-        t_exp = time.perf_counter() - t0
+        time.perf_counter() - t0
 
         retrieval_modes = [
             ("high", config.STRICT_MIN_SIMILARITY_SCORE, config.STRICT_RERANK_MIN_SCORE, config.STRICT_FINAL_TOP_K),
@@ -95,7 +121,6 @@ class RAGPipeline:
         final_chunks = []
         confidence_mode = "high"
         t_retrieval = 0.0
-        t_rank = 0.0
 
         for idx, (mode, similarity_threshold, rerank_threshold, top_k) in enumerate(retrieval_modes):
             if idx == 1:
@@ -120,7 +145,7 @@ class RAGPipeline:
                 top_k=top_k,
                 min_score=rerank_threshold,
             )
-            t_rank = time.perf_counter() - t0
+            time.perf_counter() - t0
             final_chunks = self._filter_context_chunks(final_chunks, similarity_threshold)
 
             if final_chunks:
@@ -128,7 +153,7 @@ class RAGPipeline:
                 break
 
         if not final_chunks:
-            yield "\nI could not find the exact answer in the documents."
+            yield "\nI could not find the answer in the provided documents."
             return
 
         t0 = time.perf_counter()
@@ -143,10 +168,15 @@ class RAGPipeline:
         debug_print("[dim]LLM generation started...[/dim]\n")
 
         try:
-            for token in self.llm_client.stream(messages):
-                yield token
-        except Exception as e:
-            yield f"\n\n[Error during LLM generation: {str(e)}]"
+            generator = self.llm_client.stream(messages)
+            if config.DEBUG_MODE:
+                for token in generator:
+                    yield token
+            else:
+                for token in self._filter_reasoning_stream(generator):
+                    yield token
+        except Exception as e:  # noqa: BLE001
+            yield f"\n\n[Error during LLM generation: {e!s}]"
             return
 
         sources = self._extract_sources(final_chunks)
