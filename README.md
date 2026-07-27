@@ -200,13 +200,13 @@ Type your query and press Enter. Bringer will retrieve the most relevant documen
 | `bringer models profile <name>` | Manually switch to a specific profile (e.g., `low_power`). |
 
 ### Power Commands
-| Command | Description |
-| :--- | :--- |
-| `bringer power status` | See battery/GPU state and active profile. |
-| `bringer power auto` | Enable automatic hardware-based profile switching. |
-| `bringer power low` | Force Bringer into Low Power mode. |
-| `bringer power balanced` | Force Bringer into Balanced mode. |
-| `bringer power high` | Force Bringer into High Performance mode. |
+| Command                  | Description                                        |
+| :-------------------------| :---------------------------------------------------|
+| `bringer power status`   | See battery/GPU state and active profile.          |
+| `bringer power auto`     | Enable automatic hardware-based profile switching. |
+| `bringer power low`      | Force Bringer into Low Power mode.                 |
+| `bringer power balanced` | Force Bringer into Balanced mode.                  |
+| `bringer power high`     | Force Bringer into High Performance mode.          |
 
 ### System Commands
 | Command | Description |
@@ -239,4 +239,4 @@ Bringer operates with a strict, 100% local privacy guarantee. It requires no int
 
 ## License
 
-*(Placeholder)* License to be determined.
+No license has been selected for this project yet.

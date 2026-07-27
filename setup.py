@@ -16,7 +16,6 @@ setup(
     py_modules=["bringer_cli", "config"],
     install_requires=[
         "chromadb>=0.5.0",
-        "httpx>=0.27.0",
         "langchain-text-splitters>=0.2.0",
         "llama-cpp-python>=0.2.60",
         "markdown>=3.5",
@@ -27,14 +26,13 @@ setup(
         "rank-bm25>=0.2.2",
         "rich>=13.0.0",
         "sentence-transformers>=3.0.0",
-        "streamlit>=1.35.0",
         "tiktoken>=0.7.0",
         "torch>=2.1.0",
         "watchdog>=4.0.0",
     ],
     entry_points={
         "console_scripts": [
-            "Bringer=bringer_cli:launch_bringer",
+            "bringer=bringer_cli:launch_bringer",
         ]
     },
 )
