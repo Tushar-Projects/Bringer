@@ -175,19 +175,10 @@ class HybridRetriever:
                 "final_score": 0.0
             }
             
-        # Add Keyword Results
+        # Add Keyword Results (only for chunks that passed semantic filtering)
         for chunk_id, k_res in keyword_results.items():
             if chunk_id in merged_chunks:
                 merged_chunks[chunk_id]["keyword_score"] = k_res["keyword_score"]
-            else:
-                merged_chunks[chunk_id] = {
-                    "chunk_id": chunk_id,
-                    "content": k_res["content"],
-                    "metadata": k_res["metadata"],
-                    "semantic_score": 0.0,
-                    "keyword_score": k_res["keyword_score"],
-                    "final_score": 0.0
-                }
                 
         # 4. Calculate Final Weighted Scores
         for chunk in merged_chunks.values():

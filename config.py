@@ -29,7 +29,7 @@ def get_device() -> str:
     """
     Returns 'cuda' if a GPU is available, otherwise 'cpu'.
     For RTX 4070 Laptop (8 GB VRAM), we run embeddings and reranker on GPU
-    alongside the LLM in LM Studio. If VRAM pressure occurs, set
+    alongside the LLM in llama.cpp. If VRAM pressure occurs, set
     FORCE_CPU=True below to force CPU mode for embeddings/reranking.
     """
     if FORCE_CPU:
@@ -38,6 +38,11 @@ def get_device() -> str:
 
 FORCE_CPU = False  # Set True to force embeddings & reranker onto CPU
 DEBUG_MODE = False
+
+# =============================================================================
+# Query Expansion Configuration
+# =============================================================================
+ENABLE_QUERY_EXPANSION = True
 
 DEVICE = get_device()
 
@@ -54,10 +59,16 @@ RERANK_MIN_SCORE = 0.4
 STRICT_RERANK_MIN_SCORE = 0.7
 RELAXED_RERANK_MIN_SCORE = 0.4
 
+# Semantic similarity determines if a document is relevant at all.
 SEMANTIC_TOP_K = 3
 MIN_SIMILARITY_SCORE = 0.45
 STRICT_MIN_SIMILARITY_SCORE = 0.6
 RELAXED_MIN_SIMILARITY_SCORE = 0.3
+
+# Hybrid scores primarily determine ordering after semantic relevance is established.
+STRICT_MIN_HYBRID_SCORE = 0.4
+RELAXED_MIN_HYBRID_SCORE = 0.2
+
 BM25_TOP_K = 20
 HYBRID_TOP_K = 3
 FINAL_TOP_K = 3
@@ -84,11 +95,6 @@ CHROMA_COLLECTION_NAME = "bringer_documents"
 # =============================================================================
 SUPPORTED_EXTENSIONS = {".pdf", ".docx", ".pptx", ".txt", ".md"}
 WATCH_DEBOUNCE_SECONDS = 2          # Wait time before indexing after file event
-
-# =============================================================================
-# ChromaDB
-# =============================================================================
-CHROMA_COLLECTION_NAME = "bringer_documents"
 
 # =============================================================================
 # Logging

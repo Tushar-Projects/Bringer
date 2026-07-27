@@ -1,5 +1,5 @@
 import unittest
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 import config
 from src.modules.prompt_builder import PromptBuilder
@@ -54,41 +54,53 @@ class RerankerTests(unittest.TestCase):
 
 
 class RagPipelineTests(unittest.TestCase):
-    def test_pipeline_retries_with_relaxed_retrieval_when_strict_mode_fails(self):
+    def test_pipeline_triggers_expansion_on_low_confidence(self):
         pipeline = RAGPipeline.__new__(RAGPipeline)
         pipeline.expander = Mock()
-        pipeline.expander.expand_query.return_value = ["query"]
+        pipeline.expander.expand_query.return_value = ["query", "expanded1"]
         pipeline.retriever = Mock()
-        pipeline.retriever.retrieve.side_effect = [[], [{"content": "candidate", "metadata": {"source_file": "a.txt"}, "final_score": 0.4}]]
+        # First call (original query) returns low-confidence candidates
+        # Second call (expanded1) returns high-confidence candidates
+        pipeline.retriever.retrieve.side_effect = [
+            [{"content": "candidate1", "metadata": {"source_file": "a.txt"}, "semantic_score": 0.2, "final_score": 0.2}],
+            [{"content": "candidate2", "metadata": {"source_file": "b.txt"}, "semantic_score": 0.9, "final_score": 0.9}]
+        ]
         pipeline.reranker = Mock()
-        pipeline.reranker.rerank.return_value = [{"content": "candidate", "metadata": {"source_file": "a.txt"}, "final_score": 0.4}]
+        pipeline.reranker.rerank.side_effect = [
+            [{"content": "candidate1", "metadata": {"source_file": "a.txt"}, "rerank_score": 0.3}],
+            [{"content": "candidate2", "metadata": {"source_file": "b.txt"}, "rerank_score": 0.95}]
+        ]
         pipeline.prompt_builder = Mock()
         pipeline.prompt_builder.build_prompt.return_value = ([{"role": "system", "content": "s"}, {"role": "user", "content": "u"}], 42)
         pipeline.llm_client = Mock()
         pipeline.llm_client.stream.return_value = iter(["Answer text"])
 
-        result = list(pipeline.run_rag("query"))
+        with patch("src.modules.rag_pipeline.get_config_manager") as mock_cm:
+            mock_cm.return_value.get_active_mode.return_value = "high_performance"
+            config.ENABLE_QUERY_EXPANSION = True
+            
+            result = list(pipeline.run_rag("query"))
 
-        self.assertEqual(result, ["Answer text", "\n\nSources\n", "- a.txt\n"])
+        self.assertEqual(result, ["Answer text", "\n\nSources\n", "- b.txt\n"])
+        # Original + 1 expanded query = 2 retrieval calls
         self.assertEqual(pipeline.retriever.retrieve.call_count, 2)
-        self.assertEqual(pipeline.retriever.retrieve.call_args_list[0].kwargs["min_score"], config.STRICT_MIN_SIMILARITY_SCORE)
-        self.assertEqual(pipeline.retriever.retrieve.call_args_list[1].kwargs["min_score"], config.RELAXED_MIN_SIMILARITY_SCORE)
         self.assertEqual(pipeline.prompt_builder.build_prompt.call_args.kwargs["confidence_mode"], "moderate")
 
-    def test_pipeline_uses_fallback_only_when_both_stages_fail(self):
+    def test_pipeline_uses_fallback_when_no_results(self):
         pipeline = RAGPipeline.__new__(RAGPipeline)
         pipeline.expander = Mock()
         pipeline.expander.expand_query.return_value = ["query"]
         pipeline.retriever = Mock()
-        pipeline.retriever.retrieve.side_effect = [[], []]
+        pipeline.retriever.retrieve.return_value = []
         pipeline.reranker = Mock()
+        pipeline.reranker.rerank.return_value = []
         pipeline.prompt_builder = Mock()
         pipeline.llm_client = Mock()
 
         result = list(pipeline.run_rag("query"))
 
         self.assertEqual(result, ["\nI could not find the answer in the provided documents."])
-        pipeline.reranker.rerank.assert_not_called()
+        pipeline.prompt_builder.build_prompt.assert_not_called()
 
     def test_extract_sources_prefers_page_level_citations(self):
         pipeline = RAGPipeline.__new__(RAGPipeline)

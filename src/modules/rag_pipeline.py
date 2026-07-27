@@ -3,7 +3,7 @@ Bringer RAG System - Orchestration Pipeline
 
 The central brain of the application. It receives a user query, triggers the
 hybrid retrieval engine, formats the resulting contexts into a strict prompt,
-sends it to the LM Studio LLM client, and handles the token streaming and source citations.
+sends it to the LLM client, and handles the token streaming and source citations.
 """
 
 import os
@@ -18,6 +18,8 @@ from rich.console import Console
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 import config
+from src.modules.config_manager import get_config_manager
+from src.modules.hardware_detector import HardwareDetector
 from src.modules.hybrid_retriever import HybridRetriever
 from src.modules.llm_client import LLMClient
 from src.modules.logging_utils import debug_print
@@ -37,34 +39,52 @@ class RAGPipeline:
         self.expander = QueryExpander()
         self.reranker = Reranker()
 
-    def _retrieve_candidates(
+    def _retrieve_and_merge(
         self,
-        expanded_queries: list[str],
-        similarity_threshold: float,
+        queries: list[str],
+        semantic_threshold: float,
         top_k: int,
     ) -> list[dict[str, Any]]:
         raw_chunks = {}
-        for q in expanded_queries:
+        for q in queries:
             chunks = self.retriever.retrieve(
                 q,
                 k=top_k,
-                semantic_top_k=top_k,
-                min_score=similarity_threshold,
+                semantic_top_k=config.SEMANTIC_TOP_K,
+                min_score=semantic_threshold,
             )
             for chunk in chunks:
                 chunk_id = chunk.get("chunk_id", chunk["metadata"].get("chunk_id", str(hash(chunk["content"]))))
-                if chunk_id not in raw_chunks:
+                # Merge logic: if duplicate, keep the one with higher final_score
+                if chunk_id not in raw_chunks or chunk["final_score"] > raw_chunks[chunk_id]["final_score"]:
                     raw_chunks[chunk_id] = chunk
-        return list(raw_chunks.values())
+        
+        # Sort merged candidates by final_score descending
+        merged = list(raw_chunks.values())
+        merged.sort(key=lambda x: x["final_score"], reverse=True)
+        return merged
 
-    def _filter_context_chunks(self, chunks: list[dict[str, Any]], min_similarity: float) -> list[dict[str, Any]]:
-        """Keeps only strongly related chunks before prompt construction."""
-        filtered = []
-        for chunk in chunks:
-            score = chunk.get("final_score", chunk.get("score", 0.0))
-            if score >= min_similarity:
-                filtered.append(chunk)
-        return filtered
+    def _evaluate_confidence(self, candidates: list[dict[str, Any]], reranked: list[dict[str, Any]]) -> tuple[bool, str]:
+        """
+        Evaluates retrieval confidence using multiple signals.
+        Returns a tuple of (is_confident, reason).
+        """
+        if not candidates:
+            return False, "No candidates retrieved"
+            
+        if not reranked:
+            return False, "No candidates survived reranking"
+            
+        best_semantic = max((c.get("semantic_score", 0.0) for c in candidates), default=0.0)
+        best_rerank = max((c.get("rerank_score", 0.0) for c in reranked), default=0.0)
+        
+        if best_semantic < config.STRICT_MIN_SIMILARITY_SCORE:
+            return False, f"Low semantic similarity ({best_semantic:.2f} < {config.STRICT_MIN_SIMILARITY_SCORE})"
+            
+        if best_rerank < config.STRICT_RERANK_MIN_SCORE:
+            return False, f"Low reranker confidence ({best_rerank:.2f} < {config.STRICT_RERANK_MIN_SCORE})"
+            
+        return True, "High confidence"
 
     def _extract_sources(self, chunks: list[dict[str, Any]]) -> list[str]:
         """Deduplicates and formats source metadata into clean citation strings."""
@@ -91,66 +111,100 @@ class RAGPipeline:
                 
             buffer += token
             
-            # The model is instructed to always output "Answer:" before its final answer.
-            # We suppress everything before that marker, which naturally hides all 
-            # innate reasoning steps like "Draft:", "<think>", etc.
             match = re.search(r"(?i)(?:final )?answer:\s*(?:\*\*)?", buffer)
             if match:
                 found_answer = True
                 yield buffer[match.end():]
                 buffer = ""
                 
-        # Fallback: if the model completely ignored the instruction and never output "Answer:",
-        # we yield whatever was buffered so the user doesn't get a blank response.
         if not found_answer and buffer:
             yield buffer
 
     def run_rag(self, query: str) -> Generator[str, None, None]:
         """Orchestrates the entire RAG flow: retrieve -> prompt -> stream LLM."""
-        debug_print(f"\n[bold cyan]Query:[/bold cyan] [italic]{query}[/italic]")
+        if config.DEBUG_MODE:
+            console.print(f"\n[bold cyan]Query:[/bold cyan] [italic]{query}[/italic]")
 
-        t0 = time.perf_counter()
-        expanded_queries = self.expander.expand_query(query)
-        time.perf_counter() - t0
+        # 1. Determine active profile
+        config_manager = get_config_manager()
+        active_mode = config_manager.get_active_mode()
+        profile = HardwareDetector().select_profile() if active_mode == "auto" else active_mode
+        
+        if config.DEBUG_MODE:
+            console.print(f"[dim]Power Profile:\n{profile}\n[/dim]")
+            console.print(f"[dim]Query Expansion Enabled:\n{config.ENABLE_QUERY_EXPANSION}\n[/dim]")
 
-        retrieval_modes = [
-            ("high", config.STRICT_MIN_SIMILARITY_SCORE, config.STRICT_RERANK_MIN_SCORE, config.STRICT_FINAL_TOP_K),
-            ("moderate", config.RELAXED_MIN_SIMILARITY_SCORE, config.RELAXED_RERANK_MIN_SCORE, config.RELAXED_FINAL_TOP_K),
-        ]
-
-        final_chunks = []
-        confidence_mode = "high"
-        t_retrieval = 0.0
-
-        for idx, (mode, similarity_threshold, rerank_threshold, top_k) in enumerate(retrieval_modes):
-            if idx == 1:
-                debug_print("Strict mode failed, using relaxed retrieval...")
-
+        # 2. Initial Retrieval Pass
+        semantic_threshold = config.RELAXED_MIN_SIMILARITY_SCORE # Use relaxed as base gatekeeper
+        top_k = config.RELAXED_FINAL_TOP_K
+        rerank_threshold = config.RELAXED_RERANK_MIN_SCORE
+        
+        candidates = self._retrieve_and_merge([query], semantic_threshold, top_k)
+        retained = candidates # Semantic filter happens inside retrieve
+        
+        reranked = self.reranker.rerank(
+            query,
+            retained,
+            top_k=top_k,
+            min_score=rerank_threshold,
+        )
+        
+        # 3. Evaluate Confidence
+        is_confident, reason = self._evaluate_confidence(retained, reranked)
+        
+        expanded = False
+        expansion_time = 0.0
+        
+        # 4. Conditional Query Expansion
+        if not is_confident and config.ENABLE_QUERY_EXPANSION and profile != "low_power":
             t0 = time.perf_counter()
-            unique_chunks = self._retrieve_candidates(expanded_queries, similarity_threshold, top_k)
-            t_retrieval = time.perf_counter() - t0
-            unique_chunks = self._filter_context_chunks(unique_chunks, similarity_threshold)
+            expanded_queries = self.expander.expand_query(query)
+            expansion_time = (time.perf_counter() - t0) * 1000
+            expanded = True
+            
+            # Remove original query from expanded_queries since we already searched it,
+            # actually expand_query returns the original query as well.
+            new_queries = [q for q in expanded_queries if q != query]
+            
+            if new_queries:
+                new_candidates = self._retrieve_and_merge(new_queries, semantic_threshold, top_k)
+                
+                # Merge and rescore/sort
+                raw_chunks = {c.get("chunk_id", str(hash(c["content"]))): c for c in candidates}
+                for chunk in new_candidates:
+                    chunk_id = chunk.get("chunk_id", str(hash(chunk["content"])))
+                    if chunk_id not in raw_chunks or chunk["final_score"] > raw_chunks[chunk_id]["final_score"]:
+                        raw_chunks[chunk_id] = chunk
+                        
+                retained = list(raw_chunks.values())
+                retained.sort(key=lambda x: x["final_score"], reverse=True)
+                retained = retained[:top_k]
+                
+                reranked = self.reranker.rerank(
+                    query,
+                    retained,
+                    top_k=top_k,
+                    min_score=rerank_threshold,
+                )
 
-            if not unique_chunks:
-                continue
+        final_chunks = reranked
 
-            debug_print(
-                f"[dim]Hybrid retrieval returned {len(unique_chunks)} unique chunks ({t_retrieval*1000:.1f}ms)[/dim]"
-            )
-
-            t0 = time.perf_counter()
-            final_chunks = self.reranker.rerank(
-                query,
-                unique_chunks,
-                top_k=top_k,
-                min_score=rerank_threshold,
-            )
-            time.perf_counter() - t0
-            final_chunks = self._filter_context_chunks(final_chunks, similarity_threshold)
-
-            if final_chunks:
-                confidence_mode = mode
-                break
+        # 5. Debug Diagnostics
+        if config.DEBUG_MODE:
+            console.print(f"[dim]Semantic Search:\n{len(candidates)} candidates\n[/dim]")
+            console.print(f"[dim]Semantic Filter:\n{len(retained)} retained\n[/dim]")
+            console.print(f"[dim]Hybrid Ranking:\n{len(retained)} ranked\n[/dim]")
+            console.print(f"[dim]Top-K:\n{min(len(retained), top_k)} selected\n[/dim]")
+            console.print(f"[dim]Reranker:\n{len(reranked)} reranked\n[/dim]")
+            console.print(f"[dim]Context:\n{len(final_chunks)} chunks\n[/dim]")
+            
+            if expanded:
+                console.print("[dim]Query Expansion:\nTriggered\nReason:\n" + reason + "\n[/dim]")
+                console.print(f"[dim]Expansion Time:\n{expansion_time:.1f} ms\n[/dim]")
+            else:
+                console.print("[dim]Query Expansion:\nSkipped\n[/dim]")
+                if not is_confident:
+                    console.print(f"[dim]Reason (not expanded):\n{reason}\nProfile={profile}, Enabled={config.ENABLE_QUERY_EXPANSION}[/dim]")
 
         if not final_chunks:
             yield "\nI could not find the answer in the provided documents."
@@ -160,12 +214,13 @@ class RAGPipeline:
         messages, token_estimate = self.prompt_builder.build_prompt(
             query,
             final_chunks,
-            confidence_mode=confidence_mode,
+            confidence_mode="moderate" if not is_confident else "high",
         )
         t_prompt = time.perf_counter() - t0
 
-        debug_print(f"[dim]Prompt tokens: ~{token_estimate} ({t_prompt*1000:.1f}ms)[/dim]")
-        debug_print("[dim]LLM generation started...[/dim]\n")
+        if config.DEBUG_MODE:
+            console.print(f"[dim]Prompt tokens: ~{token_estimate} ({t_prompt*1000:.1f}ms)[/dim]")
+            console.print("[dim]LLM generation started...[/dim]\n")
 
         try:
             generator = self.llm_client.stream(messages)
