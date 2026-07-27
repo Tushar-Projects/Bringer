@@ -8,18 +8,21 @@ Enforces strict token limits to prevent context window overflow (OOM or crashes)
 and grounds the LLM via strict system instructions to minimize hallucinations.
 """
 
-from typing import List, Dict, Any, Tuple
-from rich.console import Console
+import os
+import sys
+from typing import Any
+
+# pyrefly: ignore [missing-import]
 import tiktoken
 
-import sys
-import os
+# pyrefly: ignore [missing-import]
+from rich.console import Console
+
 # Add project root to path so we can import config
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
-import config
-from src.modules.logging_utils import debug_print
 from src.modules.config_manager import get_config_manager
 from src.modules.hardware_detector import HardwareDetector
+from src.modules.logging_utils import debug_print
 
 console = Console()
 
@@ -51,7 +54,8 @@ class PromptBuilder:
             "5. If the context contains relevant information, you MUST answer using it.\n"
             "6. Only say \"I could not find the answer in the provided documents.\" if there is absolutely no relevant information.\n"
             "7. Cite the source or sources used in your answer.\n"
-            "8. Do not combine unrelated chunks or pages."
+            "8. Do not combine unrelated chunks or pages.\n"
+            "9. ALWAYS prefix your final answer with 'Answer:'."
         )
 
     def _estimate_tokens(self, text: str) -> int:
@@ -61,9 +65,9 @@ class PromptBuilder:
     def build_prompt(
         self,
         query: str,
-        retrieved_chunks: List[Dict[str, Any]],
+        retrieved_chunks: list[dict[str, Any]],
         confidence_mode: str = "high",
-    ) -> Tuple[List[Dict[str, str]], int]:
+    ) -> tuple[list[dict[str, str]], int]:
         """
         Constructs the final prompt array and enforces token safety limits.
         
@@ -105,7 +109,7 @@ class PromptBuilder:
         for k, chunk in enumerate(retrieved_chunks):
             # Format the chunk with clear source attribution
             source_file = chunk["metadata"].get("source_file", "Unknown")
-            chunk_index = chunk["metadata"].get("chunk_index", 0)
+            chunk["metadata"].get("chunk_index", 0)
             page_number = chunk["metadata"].get("page_number")
             chunk_content = chunk.get("content", "").strip()
             
@@ -147,6 +151,7 @@ class PromptBuilder:
 # Quick test trigger block (only runs if executed directly)
 if __name__ == "__main__":
     import json
+
     from hybrid_retriever import HybridRetriever
     
     if len(sys.argv) > 1:
@@ -154,11 +159,11 @@ if __name__ == "__main__":
     else:
         test_query = "What is a wired LAN?"
         
-    console.print(f"\n[bold magenta]--- Prompt Builder Test ---[/bold magenta]")
+    console.print("\n[bold magenta]--- Prompt Builder Test ---[/bold magenta]")
     console.print(f"Query: \"{test_query}\"")
     
     # Use real chunks from the Hybrid Retriever
-    console.print(f"[dim]Retrieving real chunks for query...[/dim]")
+    console.print("[dim]Retrieving real chunks for query...[/dim]")
     retriever = HybridRetriever()
     real_chunks = retriever.retrieve(test_query)
     

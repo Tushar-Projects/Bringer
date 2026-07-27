@@ -8,20 +8,21 @@ with BM25 Lexical Keyword Search.
 - BM25 index is cached locally and rebuilt only when DB length changes.
 """
 
-import time
-from typing import List, Dict, Any, Optional
-from rich.console import Console
-from rank_bm25 import BM25Okapi
-
-import sys
 import os
+import sys
+import time
+from typing import Any
+
+from rank_bm25 import BM25Okapi
+from rich.console import Console
+
 # Add project root to path so we can import config
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
 import config
+from src.modules.logging_utils import debug_print
 from src.modules.retriever import Retriever
 from src.modules.vector_store import VectorStore
-from src.modules.logging_utils import debug_print
 
 console = Console()
 
@@ -34,10 +35,10 @@ class HybridRetriever:
         self.keyword_weight = config.KEYWORD_WEIGHT
         
         # BM25 State
-        self._bm25_index: Optional[BM25Okapi] = None
-        self._bm25_doc_ids: List[str] = []
-        self._bm25_docs: List[str] = []
-        self._bm25_metadatas: List[Dict[str, Any]] = []
+        self._bm25_index: BM25Okapi | None = None
+        self._bm25_doc_ids: list[str] = []
+        self._bm25_docs: list[str] = []
+        self._bm25_metadatas: list[dict[str, Any]] = []
         self._last_doc_count = -1
         
         # Preload BM25
@@ -81,7 +82,7 @@ class HybridRetriever:
         t_build = time.perf_counter() - t0
         debug_print(f"[green]Built BM25 index in {t_build*1000:.1f}ms.[/green]")
 
-    def keyword_search(self, query: str, k: int = config.BM25_TOP_K) -> Dict[str, Any]:
+    def keyword_search(self, query: str, k: int = config.BM25_TOP_K) -> dict[str, Any]:
         """
         Executes a BM25 lexical search and returns normalized scores.
         """
@@ -132,7 +133,7 @@ class HybridRetriever:
         k: int = config.HYBRID_TOP_K,
         semantic_top_k: int | None = None,
         min_score: float | None = None,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         Executes both Semantic and Lexical searches, merges results, and scores them.
         """
@@ -234,7 +235,7 @@ if __name__ == "__main__":
     if len(sys.argv) > 1:
         query_str = " ".join(sys.argv[1:])
         
-        console.print(f"\n[bold magenta]--- Hybrid Retrieval Test ---[/bold magenta]")
+        console.print("\n[bold magenta]--- Hybrid Retrieval Test ---[/bold magenta]")
         
         retriever = HybridRetriever()
         results = retriever.retrieve(query_str)

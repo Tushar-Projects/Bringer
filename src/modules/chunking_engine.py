@@ -9,17 +9,17 @@ and LangChain's RecursiveCharacterTextSplitter for syntax-aware splitting
 that respects sentence boundaries.
 """
 
+import os
 import re
+import sys
 import time
-from typing import List, Dict, Any
 from pathlib import Path
-from rich.console import Console
+from typing import Any
 
 import tiktoken
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+from rich.console import Console
 
-import sys
-import os
 # Add project root to path so we can import config
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 import config
@@ -72,7 +72,7 @@ class ChunkingEngine:
         
         return text.strip()
 
-    def chunk_document(self, document_dict: Dict[str, Any]) -> List[Dict[str, Any]]:
+    def chunk_document(self, document_dict: dict[str, Any]) -> list[dict[str, Any]]:
         """
         Splits a single document's text into token-aware chunks, inheriting metadata.
         
@@ -111,7 +111,7 @@ class ChunkingEngine:
                 continue
                 
             source_file_name = base_meta.get('source_file', 'unknown')
-            file_type = base_meta.get('file_type', 'txt')
+            base_meta.get('file_type', 'txt')
             page_number = base_meta.get('page_number')
             
             # Create a safe chunk ID from the filename and page number
@@ -145,7 +145,7 @@ class ChunkingEngine:
         
         return structured_chunks
 
-    def chunk_documents(self, documents: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def chunk_documents(self, documents: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """
         Processes a batch of documents.
         
@@ -166,9 +166,10 @@ class ChunkingEngine:
 
 # Quick test trigger block (only runs if executed directly)
 if __name__ == "__main__":
-    from document_loader import DocumentLoader
-    import sys
     import json
+    import sys
+
+    from document_loader import DocumentLoader
     
     if len(sys.argv) > 1:
         test_path_str = sys.argv[1]
@@ -176,7 +177,7 @@ if __name__ == "__main__":
         loader = DocumentLoader()
         engine = ChunkingEngine()
         
-        console.print(f"\n[bold magenta]--- Chunking Test ---[/bold magenta]")
+        console.print("\n[bold magenta]--- Chunking Test ---[/bold magenta]")
         console.print(f"1. Loading: {test_path.name}")
         pages = loader.load_document(test_path)
         

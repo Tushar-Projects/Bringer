@@ -1,5 +1,5 @@
 {
-  "active_mode": "auto",
+  "active_mode": "low_power",
   "defaults": {
     "llm": {
       "n_ctx": 8192,
@@ -22,7 +22,7 @@
   "profiles": {
     "low_power": {
       "llm": {
-        "path": "models/low.gguf"
+        "path": "D:\\AI\\Models\\Gemma4\\google_gemma-4-E2B-it-Q8_0.gguf"
       }
     },
     "balanced": {

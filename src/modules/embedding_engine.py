@@ -6,21 +6,22 @@ Uses `sentence-transformers` with automatic GPU acceleration, batched processing
 and strict memory management suitable for an 8 GB VRAM budget.
 """
 
+import os
+import sys
 import time
+from functools import lru_cache
+from typing import Any
+
 import torch
-from typing import List, Dict, Any
 from rich.console import Console
 from sentence_transformers import SentenceTransformer
-from functools import lru_cache
 
-import sys
-import os
 # Add project root to path so we can import config
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 import config
-from src.modules.logging_utils import debug_print
 from src.modules.config_manager import get_config_manager
 from src.modules.hardware_detector import HardwareDetector
+from src.modules.logging_utils import debug_print
 
 console = Console()
 
@@ -76,8 +77,8 @@ class EmbeddingEngine:
         self.batch_size = emb_config.get("batch_size", 64)
         self.expected_dimensions = emb_config.get("dimensions", 384)
 
-    @lru_cache(maxsize=128)
-    def embed_query(self, query: str) -> List[float]:
+    @lru_cache(maxsize=128)  # noqa: B019
+    def embed_query(self, query: str) -> list[float]:
         """
         Embeds a single query string. Cached using LRU to prevent repeated computation.
         
@@ -96,7 +97,7 @@ class EmbeddingEngine:
         return embedding.tolist()
 
     @torch.no_grad()
-    def generate_embeddings(self, chunks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def generate_embeddings(self, chunks: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """
         Takes a list of chunk dictionaries and adds an 'embedding' vector to each.
         
@@ -143,10 +144,11 @@ class EmbeddingEngine:
 
 # Quick test trigger block (only runs if executed directly)
 if __name__ == "__main__":
-    from document_loader import DocumentLoader
-    from chunking_engine import ChunkingEngine
     import sys
     from pathlib import Path
+
+    from chunking_engine import ChunkingEngine
+    from document_loader import DocumentLoader
     
     if len(sys.argv) > 1:
         test_path_str = sys.argv[1]
@@ -156,7 +158,7 @@ if __name__ == "__main__":
         engine = ChunkingEngine()
         embedder = EmbeddingEngine()
         
-        console.print(f"\n[bold magenta]--- Embedding Pipeline Test ---[/bold magenta]")
+        console.print("\n[bold magenta]--- Embedding Pipeline Test ---[/bold magenta]")
         pages = loader.load_document(test_path)
         
         if pages:

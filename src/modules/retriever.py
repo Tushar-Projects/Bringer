@@ -9,19 +9,19 @@ Converts ChromaDB distances (cosine/L2) into an intuitive 0-1 similarity score
 and discards chunks below a configurable threshold.
 """
 
+import os
+import sys
 import time
-from typing import List, Dict, Any
+from typing import Any
+
 from rich.console import Console
 
-import sys
-import os
 # Add project root to path so we can import config
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
 import config
-from src.modules.embedding_engine import get_embedding_model
-from src.modules.vector_store import VectorStore
 from src.modules.logging_utils import debug_print
+from src.modules.vector_store import VectorStore
 
 console = Console()
 
@@ -34,7 +34,7 @@ class Retriever:
         self.embedding_engine = EmbeddingEngine()
         self.min_score = config.MIN_SIMILARITY_SCORE
 
-    def retrieve(self, query: str, k: int = config.SEMANTIC_TOP_K, min_score: float | None = None) -> List[Dict[str, Any]]:
+    def retrieve(self, query: str, k: int = config.SEMANTIC_TOP_K, min_score: float | None = None) -> list[dict[str, Any]]:
         """
         Embeds a user query, searches ChromaDB, and returns scored and filtered chunks.
         
@@ -125,7 +125,7 @@ if __name__ == "__main__":
     if len(sys.argv) > 1:
         query_str = " ".join(sys.argv[1:])
         
-        console.print(f"\n[bold magenta]--- Semantic Retrieval Test ---[/bold magenta]")
+        console.print("\n[bold magenta]--- Semantic Retrieval Test ---[/bold magenta]")
         
         retriever = Retriever()
         results = retriever.retrieve(query_str, k=5)

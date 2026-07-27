@@ -1,29 +1,28 @@
-import subprocess
 import unittest
 from unittest.mock import Mock, patch
 
-import config
 from src.modules.hardware_detector import HardwareDetector
 
 
 class HardwareDetectorTests(unittest.TestCase):
     @patch("src.modules.hardware_detector.HardwareDetector.is_plugged_in", return_value=True)
     @patch("src.modules.hardware_detector.HardwareDetector.detect_gpu", return_value=(True, "NVIDIA RTX 4070 Laptop GPU"))
-    def test_select_model_prefers_large_model_when_gpu_and_plugged_in(self, _detect_gpu, _plugged_in):
+    def test_select_profile_prefers_large_model_when_gpu_and_plugged_in(self, _detect_gpu, _plugged_in):
         detector = HardwareDetector()
-        self.assertEqual(detector.select_model(), config.LLM_MODEL_LARGE)
+        self.assertEqual(detector.select_profile(), "high_performance")
         self.assertEqual(detector.detect_hardware()["gpu_name"], "NVIDIA RTX 4070 Laptop GPU")
 
     @patch("src.modules.hardware_detector.HardwareDetector.is_plugged_in", return_value=False)
     @patch("src.modules.hardware_detector.HardwareDetector.detect_gpu", return_value=(True, "NVIDIA RTX 4070 Laptop GPU"))
-    def test_select_model_prefers_medium_model_when_gpu_on_battery(self, _detect_gpu, _plugged_in):
+    def test_select_profile_prefers_medium_model_when_gpu_on_battery(self, _detect_gpu, _plugged_in):
         detector = HardwareDetector()
-        self.assertEqual(detector.select_model(), config.LLM_MODEL_MEDIUM)
+        self.assertEqual(detector.select_profile(), "balanced")
 
+    @patch("src.modules.hardware_detector.HardwareDetector.is_power_saver_enabled", return_value=True)
     @patch("src.modules.hardware_detector.HardwareDetector.detect_gpu", return_value=(False, "N/A"))
-    def test_select_model_prefers_small_model_when_cpu_only(self, _detect_gpu):
+    def test_select_profile_prefers_small_model_when_cpu_only(self, _detect_gpu, _power_saver):
         detector = HardwareDetector()
-        self.assertEqual(detector.select_model(), config.LLM_MODEL_SMALL)
+        self.assertEqual(detector.select_profile(), "low_power")
 
     @patch("src.modules.hardware_detector.torch")
     def test_detect_gpu_uses_torch_when_cuda_is_available(self, mock_torch):

@@ -26,3 +26,10 @@ documents/*
 # OS
 Thumbs.db
 .DS_Store
+
+# pyenv 3.10.11 set
+.python-version
+
+# ruff
+.ruff_cache
+

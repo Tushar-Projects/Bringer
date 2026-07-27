@@ -5,18 +5,18 @@ Replaces LM Studio. Handles in-process loading, unloading, and streaming
 inference of llama-cpp GGUF models based on the centralized configuration.
 """
 
-import sys
-import os
 import gc
-from typing import Optional, Dict, Any, Generator, List
-
+import os
 import sys
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
-import config
-from src.modules.logging_utils import debug_print
-from src.modules.config_manager import get_config_manager
+from collections.abc import Generator
 
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 from rich.console import Console
+
+import config
+from src.modules.config_manager import get_config_manager
+from src.modules.logging_utils import debug_print
+
 console = Console()
 
 class LlamaManager:
@@ -87,18 +87,17 @@ class LlamaManager:
             self.current_model_path = absolute_path
             debug_print("[green]Model loaded successfully.[/green]")
             return True
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             console.print(f"[bold red]Failed to load model:[/bold red] {e}")
             return False
 
     def is_model_loaded(self) -> bool:
         return self.llm is not None
         
-    def generate(self, messages: List[Dict[str, str]], profile_name: str) -> Optional[str]:
+    def generate(self, messages: list[dict[str, str]], profile_name: str) -> str | None:
         """Generates a complete response."""
-        if not self.is_model_loaded():
-            if not self.load_model(profile_name):
-                return None
+        if not self.is_model_loaded() and not self.load_model(profile_name):
+            return None
                 
         profile_config = self.config_manager.get_profile_config(profile_name)
         llm_config = profile_config.get("llm", {})
@@ -113,16 +112,15 @@ class LlamaManager:
                 stream=False
             )
             return response["choices"][0]["message"]["content"]
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             console.print(f"[bold red]Inference error:[/bold red] {e}")
             return None
 
-    def stream(self, messages: List[Dict[str, str]], profile_name: str) -> Generator[str, None, None]:
+    def stream(self, messages: list[dict[str, str]], profile_name: str) -> Generator[str, None, None]:
         """Streams the response back token by token."""
-        if not self.is_model_loaded():
-            if not self.load_model(profile_name):
-                yield "\n[Error: Could not load model for inference.]"
-                return
+        if not self.is_model_loaded() and not self.load_model(profile_name):
+            yield "\n[Error: Could not load model for inference.]"
+            return
 
         profile_config = self.config_manager.get_profile_config(profile_name)
         llm_config = profile_config.get("llm", {})
@@ -145,7 +143,7 @@ class LlamaManager:
                 delta = choices[0].get("delta", {})
                 if "content" in delta:
                     yield delta["content"]
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             yield f"\n[Streaming error: {e}]"
             
     def shutdown(self):
