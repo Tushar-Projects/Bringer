@@ -133,9 +133,20 @@ class HybridRetriever:
         k: int = config.HYBRID_TOP_K,
         semantic_top_k: int | None = None,
         min_score: float | None = None,
+        min_hybrid_score: float = 0.0,
     ) -> list[dict[str, Any]]:
         """
         Executes both Semantic and Lexical searches, merges results, and scores them.
+
+        Args:
+            query: The search query.
+            k: Number of final results to return.
+            semantic_top_k: Override for the semantic candidate pool size.
+            min_score: Minimum semantic similarity for the dense search.
+            min_hybrid_score: Minimum final_score for BM25-only hits (chunks
+                that did not appear in the semantic results). This prevents
+                keyword-only matches from bypassing quality gating while still
+                allowing strong BM25 matches to enter the candidate pool.
         """
         t_start = time.perf_counter()
         
@@ -147,7 +158,6 @@ class HybridRetriever:
         t_key = time.perf_counter() - t0
         
         # 2. Execute Semantic Search 
-        # (Pass large k here so we get good candidate pools to merge, we trim at the end)
         t0 = time.perf_counter()
         semantic_results = self.semantic_retriever.retrieve(
             query,
@@ -162,8 +172,6 @@ class HybridRetriever:
         
         # Add Semantic Results
         for s_res in semantic_results:
-            # We must fetch chunk_id from metadata or reconstruct it (assuming vector DB metadatas carry it, 
-            # let's fallback to content hash if chunk_id isn't directly bound at the top level)
             chunk_id = s_res["metadata"].get("chunk_id", str(hash(s_res["content"])))
             
             merged_chunks[chunk_id] = {
@@ -175,10 +183,25 @@ class HybridRetriever:
                 "final_score": 0.0
             }
             
-        # Add Keyword Results (only for chunks that passed semantic filtering)
+        # Add Keyword Results
         for chunk_id, k_res in keyword_results.items():
             if chunk_id in merged_chunks:
+                # Chunk already in pool from semantic search — enrich with keyword score
                 merged_chunks[chunk_id]["keyword_score"] = k_res["keyword_score"]
+            else:
+                # BM25-only hit: compute its would-be final_score from keyword
+                # component alone (semantic_score is 0) and admit it only if it
+                # clears the hybrid threshold.
+                keyword_only_final = round(self.keyword_weight * k_res["keyword_score"], 4)
+                if keyword_only_final >= min_hybrid_score:
+                    merged_chunks[chunk_id] = {
+                        "chunk_id": chunk_id,
+                        "content": k_res["content"],
+                        "metadata": k_res["metadata"],
+                        "semantic_score": 0.0,
+                        "keyword_score": k_res["keyword_score"],
+                        "final_score": 0.0
+                    }
                 
         # 4. Calculate Final Weighted Scores
         for chunk in merged_chunks.values():

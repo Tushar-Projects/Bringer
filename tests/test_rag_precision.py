@@ -114,6 +114,19 @@ class RagPipelineTests(unittest.TestCase):
 
         self.assertEqual(sources, ["Module_2.pdf (page 17)", "notes.txt"])
 
+    def test_retrieve_and_merge_scales_semantic_top_k_with_top_k(self):
+        """_retrieve_and_merge should pass semantic_top_k=top_k to the
+        retriever, not a hardcoded constant."""
+        pipeline = RAGPipeline.__new__(RAGPipeline)
+        pipeline.retriever = Mock()
+        pipeline.retriever.retrieve.return_value = []
+
+        pipeline._retrieve_and_merge(["test query"], 0.3, top_k=7, min_hybrid_score=0.2)
+
+        call_kwargs = pipeline.retriever.retrieve.call_args.kwargs
+        self.assertEqual(call_kwargs["semantic_top_k"], 7)
+        self.assertEqual(call_kwargs["min_hybrid_score"], 0.2)
+
 
 if __name__ == "__main__":
     unittest.main()

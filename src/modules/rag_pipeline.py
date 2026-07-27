@@ -44,14 +44,16 @@ class RAGPipeline:
         queries: list[str],
         semantic_threshold: float,
         top_k: int,
+        min_hybrid_score: float = 0.0,
     ) -> list[dict[str, Any]]:
         raw_chunks = {}
         for q in queries:
             chunks = self.retriever.retrieve(
                 q,
                 k=top_k,
-                semantic_top_k=config.SEMANTIC_TOP_K,
+                semantic_top_k=top_k,
                 min_score=semantic_threshold,
+                min_hybrid_score=min_hybrid_score,
             )
             for chunk in chunks:
                 chunk_id = chunk.get("chunk_id", chunk["metadata"].get("chunk_id", str(hash(chunk["content"]))))
@@ -139,7 +141,7 @@ class RAGPipeline:
         top_k = config.RELAXED_FINAL_TOP_K
         rerank_threshold = config.RELAXED_RERANK_MIN_SCORE
         
-        candidates = self._retrieve_and_merge([query], semantic_threshold, top_k)
+        candidates = self._retrieve_and_merge([query], semantic_threshold, top_k, min_hybrid_score=config.RELAXED_MIN_HYBRID_SCORE)
         retained = candidates # Semantic filter happens inside retrieve
         
         reranked = self.reranker.rerank(
@@ -167,7 +169,7 @@ class RAGPipeline:
             new_queries = [q for q in expanded_queries if q != query]
             
             if new_queries:
-                new_candidates = self._retrieve_and_merge(new_queries, semantic_threshold, top_k)
+                new_candidates = self._retrieve_and_merge(new_queries, semantic_threshold, top_k, min_hybrid_score=config.RELAXED_MIN_HYBRID_SCORE)
                 
                 # Merge and rescore/sort
                 raw_chunks = {c.get("chunk_id", str(hash(c["content"]))): c for c in candidates}
