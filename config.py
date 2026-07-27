@@ -65,8 +65,10 @@ MIN_SIMILARITY_SCORE = 0.45
 STRICT_MIN_SIMILARITY_SCORE = 0.6
 RELAXED_MIN_SIMILARITY_SCORE = 0.3
 
-# Hybrid scores primarily determine ordering after semantic relevance is established.
-STRICT_MIN_HYBRID_SCORE = 0.4
+# Minimum final_score for BM25-only hits (no semantic match) to enter the
+# candidate pool.  Prevents ungated keyword-only results while still allowing
+# strong exact-term matches (part numbers, codes, acronyms) to surface.
+MIN_HYBRID_SCORE = 0.2
 RELAXED_MIN_HYBRID_SCORE = 0.2
 
 BM25_TOP_K = 20
